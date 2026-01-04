@@ -228,6 +228,51 @@ class ActiveTripsView(generics.ListAPIView):
         return queryset
 
 
+class ConductorTripHistoryView(APIView):
+    """List trip history for the current conductor/driver with pagination."""
+    permission_classes = [IsConductorOrDriver]
+    
+    def get(self, request):
+        user = request.user
+        # Get trips where user was conductor or driver
+        queryset = Trip.objects.filter(
+            Q(conductor=user) | Q(driver=user)
+        ).select_related('bus', 'route', 'driver', 'conductor').order_by('-scheduled_start')
+        
+        # Filter by status
+        trip_status = request.query_params.get('status')
+        if trip_status:
+            queryset = queryset.filter(status=trip_status)
+        
+        # Get total counts before pagination
+        total_count = queryset.count()
+        completed_count = queryset.filter(status=TripStatus.COMPLETED).count()
+        
+        # Get today's count
+        from django.utils import timezone
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_count = queryset.filter(scheduled_start__gte=today_start).count()
+        
+        # Pagination
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
+        start = (page - 1) * page_size
+        end = start + page_size
+        
+        trips = queryset[start:end]
+        has_next = queryset.count() > end
+        
+        return Response({
+            'results': TripSerializer(trips, many=True).data,
+            'total_count': total_count,
+            'completed_count': completed_count,
+            'today_count': today_count,
+            'page': page,
+            'page_size': page_size,
+            'has_next': has_next,
+        })
+
+
 class StartTripView(APIView):
     """Start a new trip."""
     permission_classes = [IsConductorOrDriver]

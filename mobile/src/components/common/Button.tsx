@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     ViewStyle,
     TextStyle,
+    StyleProp,
 } from 'react-native';
 import { colors } from '../../constants/colors';
 import { theme } from '../../constants/theme';
@@ -21,8 +22,8 @@ interface ButtonProps {
     size?: 'small' | 'medium' | 'large';
     disabled?: boolean;
     loading?: boolean;
-    style?: ViewStyle;
-    textStyle?: TextStyle;
+    style?: StyleProp<ViewStyle>;
+    textStyle?: StyleProp<TextStyle>;
     icon?: React.ReactNode;
 }
 

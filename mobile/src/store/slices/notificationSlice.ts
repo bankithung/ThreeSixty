@@ -28,12 +28,17 @@ const notificationSlice = createSlice({
         clearRealtimeNotifications: (state) => {
             state.realtimeNotifications = [];
         },
+
+        clearNotificationState: (state) => {
+            return initialState;
+        },
     },
 });
 
 export const {
     addRealtimeNotification,
-    clearRealtimeNotifications
+    clearRealtimeNotifications,
+    clearNotificationState,
 } = notificationSlice.actions;
 
 export default notificationSlice.reducer;

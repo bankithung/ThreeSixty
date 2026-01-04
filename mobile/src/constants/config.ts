@@ -3,8 +3,8 @@
  */
 
 // API Configuration
-export const API_BASE_URL = 'http://10.0.2.2:8000/api';
-export const WS_BASE_URL = 'ws://10.0.2.2:8000/ws';
+export const API_BASE_URL = 'https://2cfc2713ddcf.ngrok-free.app/api';
+export const WS_BASE_URL = 'wss://2cfc2713ddcf.ngrok-free.app/ws';
 
 // Google Maps
 export const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY';

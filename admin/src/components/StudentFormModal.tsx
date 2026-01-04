@@ -68,6 +68,7 @@ export default function StudentFormModal({ isOpen, onClose, student, onSuccess }
                 pickup_longitude: student.pickup_longitude ? String(student.pickup_longitude) : '0',
             }])
             setSchool(student.school || '')
+            setSelectedRoute(student.route || '')
 
             // Check if student has transport
             if (student.pickup_address && student.pickup_address.trim() !== '') {
@@ -161,7 +162,18 @@ export default function StudentFormModal({ isOpen, onClose, student, onSuccess }
 
         if (student) {
             // Edit mode - use existing update logic
-            const data = { ...students[0], school }
+            const s = students[0]
+            const data = {
+                ...s,
+                school,
+                route: hasTransport && selectedRoute ? selectedRoute : null,
+                pickup_latitude: hasTransport ? parseFloat(s.pickup_latitude) || 0 : null,
+                pickup_longitude: hasTransport ? parseFloat(s.pickup_longitude) || 0 : null,
+                pickup_address: hasTransport ? s.pickup_address : null,
+                drop_address: hasTransport ? s.pickup_address : null, // Default drop to pickup
+                drop_latitude: hasTransport ? parseFloat(s.pickup_latitude) || 0 : null,
+                drop_longitude: hasTransport ? parseFloat(s.pickup_longitude) || 0 : null,
+            }
             updateMutation.mutate({ id: student.id, data })
         } else {
             // New enrollment - use parent-first endpoint
@@ -461,7 +473,10 @@ export default function StudentFormModal({ isOpen, onClose, student, onSuccess }
                             <h3 className="font-medium text-gray-900 mb-4 flex items-center">
                                 <FiCamera className="mr-2" /> Face Registration
                             </h3>
-                            <FaceRegistration studentId={student.id} />
+                            <FaceRegistration
+                                studentId={student.id}
+                                hasExistingFace={student.has_face || (student.face_count && student.face_count > 0)}
+                            />
                         </div>
                     )}
 

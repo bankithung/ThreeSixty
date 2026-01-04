@@ -1,234 +1,241 @@
 /**
- * Parent Home Screen - Professional Flat & Bordered Design
+ * Parent Home Screen - Professional Minimalist Dashboard
+ * Matching Conductor Dashboard design patterns
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import {
     View,
     Text,
     StyleSheet,
-    ScrollView,
-    RefreshControl,
     SafeAreaView,
+    ScrollView,
     TouchableOpacity,
-    Image,
+    useWindowDimensions,
+    StatusBar,
+    RefreshControl,
 } from 'react-native';
+import { ParentScreenProps } from '../../types/navigation';
+import { useGetChildrenQuery, useGetChildStatusQuery, useGetUnreadCountQuery } from '../../store/api';
+import { useAuth } from '../../hooks';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
-import { ParentTabScreenProps } from '../../types/navigation';
-import { useAppDispatch, useAppSelector } from '../../hooks';
-import { selectChild } from '../../store/slices/tripSlice';
-import {
-    useGetChildrenQuery,
-    useGetChildStatusQuery,
-    useGetUnreadCountQuery,
-} from '../../store/api';
 import { Avatar, LoadingSpinner } from '../../components/common';
-import StudentCard from '../../components/cards/StudentCard';
+import { Student } from '../../types/models';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
-// Design Constants
+// Professional muted color palette - matching Conductor
 const COLORS = {
-    background: '#FAFAFA',
-    primary: '#4F46E5', // Indigo
-    textDark: '#1E293B', // Dark Slate
-    slate200: '#E2E8F0',
-    slate100: '#F1F5F9',
-    indigo50: '#EEF2FF',
-    textGrey: '#64748B', // Slate-500
-    white: '#FFFFFF',
+    dark: '#1a1a2e',
+    darkGray: '#2d2d44',
+    mediumGray: '#4a4a68',
+    lightGray: '#8a8aa3',
+    surface: '#f8f9fa',
+    white: '#ffffff',
+    accent: '#4f46e5',
+    success: '#059669',
+    warning: '#d97706',
+    error: '#dc2626',
+    border: '#e5e7eb',
 };
 
-const ParentHomeScreen: React.FC<ParentTabScreenProps<'Home'>> = () => {
-    const navigation = useNavigation<any>();
-    const dispatch = useAppDispatch();
-    const { user } = useAppSelector((state) => state.auth);
-    const { selectedChildId } = useAppSelector((state) => state.trip);
+// Compact Child Card for horizontal scroll
+const CompactChildCard: React.FC<{
+    child: Student;
+    onPress: () => void;
+    onTrack: () => void;
+}> = ({ child, onPress, onTrack }) => {
+    const { data: status, isLoading } = useGetChildStatusQuery(child.id);
 
-    // RTK Query hooks
-    const {
-        data: children = [],
-        isLoading: isLoadingChildren,
-        isFetching: isFetchingChildren,
-        refetch: refetchChildren,
-    } = useGetChildrenQuery();
+    const getStatusInfo = () => {
+        if (!status) return { text: '...', color: COLORS.mediumGray, bg: '#f3f4f6' };
+        switch (status.status) {
+            case 'on_bus': return { text: 'On Bus', color: '#ffffff', bg: COLORS.success };
+            case 'dropped': return { text: 'Home', color: '#ffffff', bg: COLORS.dark };
+            default: return { text: 'Waiting', color: '#ffffff', bg: COLORS.warning };
+        }
+    };
 
-    const {
-        data: childStatus,
-    } = useGetChildStatusQuery(selectedChildId!, {
-        skip: !selectedChildId,
-        pollingInterval: 30000,
-    });
+    const statusInfo = getStatusInfo();
+    const childName = child.full_name || `${child.first_name || ''} ${child.last_name || ''}`.trim() || 'Unknown';
+    const firstName = child.first_name || childName.split(' ')[0];
 
-    const { data: unreadData } = useGetUnreadCountQuery(undefined, {
-        pollingInterval: 60000,
-    });
+    return (
+        <TouchableOpacity style={styles.compactCard} onPress={onPress} activeOpacity={0.7}>
+            {/* Avatar with status banner */}
+            <View style={styles.avatarWrapper}>
+                <Avatar source={child.photo} name={childName} size="medium" />
+                {/* LinkedIn-style status banner */}
+                <View style={[styles.statusBanner, { backgroundColor: statusInfo.bg }]}>
+                    <Text style={[styles.statusBannerText, { color: statusInfo.color }]}>
+                        {statusInfo.text}
+                    </Text>
+                </View>
+            </View>
 
-    const handleChildPress = useCallback((studentId: string) => {
-        dispatch(selectChild(studentId));
+            <Text style={styles.compactName} numberOfLines={1}>{firstName}</Text>
+            <Text style={styles.compactGrade}>Grade {child.grade}</Text>
+
+            {status?.active_trip_id && (
+                <TouchableOpacity style={styles.compactTrackBtn} onPress={(e) => { e.stopPropagation(); onTrack(); }}>
+                    <Icon name="location-on" size={14} color={COLORS.white} />
+                </TouchableOpacity>
+            )}
+        </TouchableOpacity>
+    );
+};
+
+const ParentHomeScreen: React.FC<any> = ({ navigation }) => {
+    const { width } = useWindowDimensions();
+    const { user } = useAuth();
+    const { data: children = [], isLoading, refetch, isFetching } = useGetChildrenQuery();
+    const { data: unreadData } = useGetUnreadCountQuery();
+    const unreadCount = unreadData?.unread_count ?? 0;
+
+    const handleChildPress = (studentId: string) => {
+        navigation.navigate('ChildDetails', { studentId });
+    };
+
+    const handleTrackPress = (studentId: string) => {
         navigation.navigate('Track', { studentId });
-    }, [dispatch, navigation]);
+    };
 
-    const handleRefresh = useCallback(() => {
-        refetchChildren();
-    }, [refetchChildren]);
+    const greeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good morning';
+        if (hour < 17) return 'Good afternoon';
+        return 'Good evening';
+    };
 
-    if (isLoadingChildren && children.length === 0) {
-        return <LoadingSpinner fullScreen text="Loading..." />;
+    if (isLoading) {
+        return <LoadingSpinner fullScreen />;
     }
 
     return (
         <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.dark} />
+
+            {/* Dark Header - Matching Conductor */}
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.greeting}>Hello, {user?.first_name || 'Parent'}</Text>
+                    <Text style={styles.subtitle}>
+                        {children.length > 0 ? `${children.length} child${children.length > 1 ? 'ren' : ''} registered` : 'No children yet'}
+                    </Text>
+                </View>
+                <TouchableOpacity onPress={() => navigation.navigate('Profile' as any)} style={styles.avatarBtn}>
+                    <Avatar source={user?.avatar} name={user?.full_name || ''} size="small" />
+                </TouchableOpacity>
+            </View>
+
+            {/* Content */}
             <ScrollView
+                style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl
-                        refreshing={isFetchingChildren}
-                        onRefresh={handleRefresh}
-                        colors={[COLORS.primary]}
-                        tintColor={COLORS.primary}
-                    />
+                    <RefreshControl refreshing={isFetching} onRefresh={refetch} />
                 }
             >
-                {/* Header */}
-                <View style={styles.header}>
-                    <View>
-                        <Text style={styles.greetingTitle}>
-                            Hello, {user?.first_name || 'User'}!
-                        </Text>
-                        <Text style={styles.greetingSubtitle}>Welcome back</Text>
-                    </View>
-                    <View style={styles.avatarContainer}>
-                        <Avatar
-                            source={user?.avatar}
-                            name={user?.full_name || 'U'}
-                            size="medium"
-                            style={{ width: 48, height: 48, borderRadius: 24 }} // Ensure circle
-                        />
-                    </View>
-                </View>
-
-                {/* Section 1: My Family */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>My Family</Text>
-
-                    {children.length === 0 ? (
-                        <View style={styles.emptyCard}>
-                            <View style={styles.emptyIconCircle}>
-                                <Icon name="family-restroom" size={32} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.emptyTitle}>No children linked</Text>
-                            <Text style={styles.emptySubtitle}>
-                                Link your child's account to start tracking
+                <Animated.View entering={FadeInDown}>
+                    {/* Stats Row */}
+                    <View style={styles.statsRow}>
+                        <View style={styles.statCard}>
+                            <Text style={styles.statValue}>{children.length}</Text>
+                            <Text style={styles.statLabel}>Children</Text>
+                        </View>
+                        <View style={styles.statCard}>
+                            <Text style={[styles.statValue, { color: COLORS.success }]}>
+                                {children.filter((c: Student) => c.route_name).length}
                             </Text>
-                            <TouchableOpacity style={styles.linkButton} onPress={() => { }}>
-                                <Text style={styles.linkButtonText}>Link Account</Text>
+                            <Text style={styles.statLabel}>On Route</Text>
+                        </View>
+                        <View style={styles.statCard}>
+                            <Text style={[styles.statValue, { color: unreadCount > 0 ? COLORS.error : COLORS.accent }]}>
+                                {unreadCount}
+                            </Text>
+                            <Text style={styles.statLabel}>Alerts</Text>
+                        </View>
+                    </View>
+
+                    {/* Children Section - Horizontal Scroll */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Your Children</Text>
+                        {children.length === 0 ? (
+                            <View style={styles.emptyCard}>
+                                <Icon name="child-care" size={40} color={COLORS.lightGray} />
+                                <Text style={styles.emptyTitle}>No Children Added</Text>
+                                <Text style={styles.emptySubtitle}>Contact your school to link your children</Text>
+                            </View>
+                        ) : (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.childrenScroll}
+                            >
+                                {children.map((child: Student) => (
+                                    <CompactChildCard
+                                        key={child.id}
+                                        child={child}
+                                        onPress={() => handleChildPress(child.id)}
+                                        onTrack={() => handleTrackPress(child.id)}
+                                    />
+                                ))}
+                            </ScrollView>
+                        )}
+                    </View>
+
+                    {/* Quick Access Section */}
+                    <View style={styles.quickAccessSection}>
+                        <Text style={styles.sectionTitle}>Quick Access</Text>
+                        <View style={styles.quickAccessCard}>
+                            <TouchableOpacity style={styles.quickAccessItem} onPress={() => navigation.navigate('Track' as any)}>
+                                <View style={[styles.quickAccessIcon, { backgroundColor: '#e0f2fe' }]}>
+                                    <Icon name="location-on" size={20} color="#0284c7" />
+                                </View>
+                                <View style={styles.quickAccessInfo}>
+                                    <Text style={styles.quickAccessTitle}>Track Bus</Text>
+                                    <Text style={styles.quickAccessSubtitle}>Live location updates</Text>
+                                </View>
+                                <Icon name="chevron-right" size={20} color={COLORS.border} />
+                            </TouchableOpacity>
+
+                            <View style={styles.quickAccessDivider} />
+
+                            <TouchableOpacity style={styles.quickAccessItem} onPress={() => navigation.navigate('Fees' as any)}>
+                                <View style={[styles.quickAccessIcon, { backgroundColor: '#fef3c7' }]}>
+                                    <Icon name="receipt-long" size={20} color="#d97706" />
+                                </View>
+                                <View style={styles.quickAccessInfo}>
+                                    <Text style={styles.quickAccessTitle}>Fees & Payments</Text>
+                                    <Text style={styles.quickAccessSubtitle}>View dues and history</Text>
+                                </View>
+                                <Icon name="chevron-right" size={20} color={COLORS.border} />
+                            </TouchableOpacity>
+
+                            <View style={styles.quickAccessDivider} />
+
+                            <TouchableOpacity style={styles.quickAccessItem} onPress={() => navigation.navigate('Notifications' as any)}>
+                                <View style={[styles.quickAccessIcon, { backgroundColor: '#fce7f3' }]}>
+                                    <Icon name="notifications" size={20} color="#db2777" />
+                                    {unreadCount > 0 && (
+                                        <View style={styles.notifBadge}>
+                                            <Text style={styles.notifBadgeText}>
+                                                {unreadCount > 9 ? '9+' : unreadCount}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <View style={styles.quickAccessInfo}>
+                                    <Text style={styles.quickAccessTitle}>Notifications</Text>
+                                    <Text style={styles.quickAccessSubtitle}>
+                                        {unreadCount > 0 ? `${unreadCount} unread` : 'Alerts and updates'}
+                                    </Text>
+                                </View>
+                                <Icon name="chevron-right" size={20} color={COLORS.border} />
                             </TouchableOpacity>
                         </View>
-                    ) : (
-                        <View>
-                            {children.map((child) => (
-                                <StudentCard
-                                    key={child.id}
-                                    student={child}
-                                    onPress={() => handleChildPress(child.id)}
-                                    status={
-                                        childStatus?.student.id === child.id
-                                            ? childStatus.status
-                                            : undefined
-                                    }
-                                    showRoute
-                                />
-                            ))}
-                        </View>
-                    )}
-                </View>
-
-                {/* Section 2: Quick Actions */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Quick Actions</Text>
-                    <View style={styles.quickActionsRow}>
-                        {/* Card 1: View Live Map */}
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => navigation.navigate('Track', { studentId: selectedChildId })}
-                        >
-                            <View style={styles.actionIconContainer}>
-                                <Icon name="location-on" size={30} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.actionCardLabel}>Track</Text>
-                        </TouchableOpacity>
-
-                        <View style={{ width: 16 }} />
-
-                        {/* Card 2: Alerts & Notifications */}
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => navigation.navigate('Notifications')}
-                        >
-                            <View style={styles.actionIconContainer}>
-                                <Icon name="notifications" size={30} color={COLORS.primary} />
-                                {(unreadData?.unread_count ?? 0) > 0 && (
-                                    <View style={styles.notificationDot} />
-                                )}
-                            </View>
-                            <Text style={styles.actionCardLabel}>Alerts</Text>
-                        </TouchableOpacity>
-
-                        <View style={{ width: 16 }} />
-
-                        {/* Card 3: Marksheets */}
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => { }}
-                        >
-                            <View style={styles.actionIconContainer}>
-                                <Icon name="grade" size={30} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.actionCardLabel}>Grades</Text>
-                        </TouchableOpacity>
                     </View>
-
-                    {/* Row 2 */}
-                    <View style={[styles.quickActionsRow, { marginTop: 16 }]}>
-                        {/* Card 4: Fees */}
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => { }}
-                        >
-                            <View style={styles.actionIconContainer}>
-                                <Icon name="payments" size={30} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.actionCardLabel}>Fees</Text>
-                        </TouchableOpacity>
-
-                        <View style={{ width: 16 }} />
-
-                        {/* Card 5: Progress */}
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => { }}
-                        >
-                            <View style={styles.actionIconContainer}>
-                                <Icon name="trending-up" size={30} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.actionCardLabel}>Progress</Text>
-                        </TouchableOpacity>
-
-                        <View style={{ width: 16 }} />
-
-                        {/* Card 6: Achievements */}
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => { }}
-                        >
-                            <View style={styles.actionIconContainer}>
-                                <Icon name="emoji-events" size={30} color={COLORS.primary} />
-                            </View>
-                            <Text style={styles.actionCardLabel}>Awards</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
+                </Animated.View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -237,144 +244,218 @@ const ParentHomeScreen: React.FC<ParentTabScreenProps<'Home'>> = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: COLORS.surface,
     },
-    scrollContent: {
-        paddingHorizontal: 24,
-        paddingVertical: 16,
-        paddingBottom: 32,
-    },
-    // Header
     header: {
+        backgroundColor: COLORS.dark,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 32,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 32,
-        marginTop: 8,
     },
-    greetingTitle: {
-        fontSize: 24,
-        fontWeight: '700', // Bold
-        color: COLORS.textDark,
-        marginBottom: 4,
+    greeting: {
+        fontSize: 22,
+        fontWeight: '600',
+        color: COLORS.white,
+        letterSpacing: -0.3,
     },
-    greetingSubtitle: {
-        fontSize: 14,
-        color: COLORS.textGrey,
+    subtitle: {
+        fontSize: 13,
+        color: COLORS.lightGray,
+        marginTop: 2,
     },
-    avatarContainer: {
-        padding: 2, // Border width simulation if Avatar doesn't support it directly
-        borderRadius: 50,
-        borderWidth: 1.5,
-        borderColor: COLORS.slate200,
+    avatarBtn: {
+        padding: 2,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: COLORS.mediumGray,
+    },
+    scrollView: {
+        flex: 1,
+        backgroundColor: COLORS.dark,
+    },
+    scrollContent: {
+        backgroundColor: COLORS.surface,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 16,
+        paddingTop: 20,
+        paddingBottom: 32,
+        minHeight: '100%',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 24,
+    },
+    statCard: {
+        flex: 1,
         backgroundColor: COLORS.white,
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
-
-    // Sections
+    statValue: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: COLORS.dark,
+    },
+    statLabel: {
+        fontSize: 11,
+        color: COLORS.lightGray,
+        marginTop: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
     section: {
-        marginBottom: 32,
+        marginBottom: 24,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 15,
         fontWeight: '600',
-        color: COLORS.textDark,
+        color: COLORS.dark,
         marginBottom: 12,
+        letterSpacing: -0.2,
     },
-
-    // Empty State Card
-    emptyCard: {
-        width: '100%',
-        padding: 24,
+    childrenScroll: {
+        paddingRight: 16,
+        gap: 12,
+    },
+    compactCard: {
+        width: 100,
         backgroundColor: COLORS.white,
-        borderRadius: 12,
-        borderWidth: 1.5,
-        borderColor: COLORS.slate200,
+        borderRadius: 14,
+        padding: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        position: 'relative',
+    },
+    avatarWrapper: {
+        position: 'relative',
         alignItems: 'center',
     },
-    emptyIconCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: COLORS.slate100,
+    statusBanner: {
+        position: 'absolute',
+        bottom: -4,
+        left: -8,
+        right: -8,
+        paddingVertical: 3,
+        paddingHorizontal: 6,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    statusBannerText: {
+        fontSize: 8,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    compactName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.dark,
+        marginTop: 12,
+        textAlign: 'center',
+    },
+    compactGrade: {
+        fontSize: 11,
+        color: COLORS.lightGray,
+        marginTop: 2,
+    },
+    compactTrackBtn: {
+        marginTop: 10,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: COLORS.dark,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
     },
-    emptyIconText: {
-        fontSize: 32,
+    emptyCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 14,
+        padding: 40,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
     },
     emptyTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
-        color: COLORS.textDark,
-        marginBottom: 8,
+        color: COLORS.dark,
+        marginTop: 12,
     },
     emptySubtitle: {
-        fontSize: 14,
-        color: COLORS.textGrey,
+        fontSize: 13,
+        color: COLORS.lightGray,
+        marginTop: 4,
         textAlign: 'center',
-        marginBottom: 20,
     },
-    linkButton: {
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 8,
-        borderWidth: 1.5,
-        borderColor: COLORS.primary,
-        backgroundColor: 'transparent',
+    quickAccessCard: {
+        backgroundColor: COLORS.white,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        overflow: 'hidden',
     },
-    linkButtonText: {
-        color: COLORS.primary,
-        fontWeight: '600',
-        fontSize: 14,
-    },
-
-    // Quick Actions
-    quickActionsRow: {
+    quickAccessItem: {
         flexDirection: 'row',
-        justifyContent: 'flex-start',
-    },
-    actionCard: {
-        width: 110,
-        padding: 12,
-        backgroundColor: COLORS.indigo50,
-        borderRadius: 12,
-        borderWidth: 1.5,
-        borderColor: COLORS.slate200,
         alignItems: 'center',
-        justifyContent: 'center',
-        height: 95,
+        padding: 16,
     },
-    actionIconContainer: {
-        padding: 8,
-        backgroundColor: COLORS.indigo50,
-        borderRadius: 8,
+    quickAccessIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: COLORS.surface,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    actionLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: COLORS.textDark,
-        marginTop: 16,
-        lineHeight: 22,
+    quickAccessInfo: {
+        flex: 1,
+        marginLeft: 14,
     },
-    actionCardLabel: {
-        fontSize: 11,
+    quickAccessTitle: {
+        fontSize: 14,
         fontWeight: '600',
-        color: COLORS.primary,
-        marginTop: 6,
-        textAlign: 'center',
+        color: '#1a1a2e',
     },
-    notificationDot: {
+    quickAccessSubtitle: {
+        fontSize: 12,
+        color: '#9ca3af',
+        marginTop: 2,
+    },
+    quickAccessSection: {
+        marginBottom: 8,
+    },
+    quickAccessDivider: {
+        height: 1,
+        backgroundColor: COLORS.border,
+        marginHorizontal: 16,
+    },
+    notifBadge: {
         position: 'absolute',
-        top: -2,
-        right: -2,
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#EF4444', // Red
-    }
+        top: -4,
+        right: -4,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#ef4444',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    notifBadgeText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#ffffff',
+    },
 });
 
 export default ParentHomeScreen;

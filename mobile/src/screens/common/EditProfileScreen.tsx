@@ -1,5 +1,5 @@
 /**
- * Edit Profile Screen
+ * Edit Profile Screen - Compact Minimal UI
  */
 
 import React, { useState, useCallback } from 'react';
@@ -11,20 +11,33 @@ import {
     SafeAreaView,
     TouchableOpacity,
     Alert,
+    TextInput,
+    StatusBar,
 } from 'react-native';
 import { useAuth } from '../../hooks';
 import { useUpdateProfileMutation } from '../../store/api';
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Button, Input, Avatar, LoadingSpinner } from '../../components/common';
+import { LoadingSpinner } from '../../components/common';
+
+const COLORS = {
+    dark: '#1a1a2e',
+    darkGray: '#2d2d44',
+    mediumGray: '#6b7280',
+    lightGray: '#9ca3af',
+    surface: '#f3f4f6',
+    white: '#ffffff',
+    accent: '#4f46e5',
+    success: '#10b981',
+    error: '#ef4444',
+    border: '#e5e7eb',
+};
 
 interface EditProfileScreenProps {
     navigation: any;
 }
 
 const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => {
-    const { user, refetchProfile } = useAuth();
+    const { user } = useAuth();
     const [updateProfile, { isLoading }] = useUpdateProfileMutation();
 
     const [firstName, setFirstName] = useState(user?.first_name || '');
@@ -32,31 +45,31 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
     const [email, setEmail] = useState(user?.email || '');
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const hasChanges =
+        firstName.trim() !== (user?.first_name || '') ||
+        lastName.trim() !== (user?.last_name || '') ||
+        email.trim() !== (user?.email || '');
+
     const validate = () => {
         const newErrors: { [key: string]: string } = {};
-
         if (!firstName.trim()) {
             newErrors.firstName = 'First name is required';
         }
-
         if (email && !/\S+@\S+\.\S+/.test(email)) {
             newErrors.email = 'Invalid email address';
         }
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const handleSave = useCallback(async () => {
         if (!validate()) return;
-
         try {
             await updateProfile({
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
                 email: email.trim() || null,
             }).unwrap();
-
             Alert.alert('Success', 'Profile updated successfully', [
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
@@ -69,73 +82,89 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
         return <LoadingSpinner fullScreen />;
     }
 
+    const initials = (user.full_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Icon name="arrow-back" size={24} color={colors.primary} />
-                        <Text style={[styles.backText, { marginLeft: 4 }]}>Back</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.title}>Edit Profile</Text>
-                    <View style={{ width: 50 }} />
-                </View>
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.dark} />
 
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Icon name="arrow-back" size={20} color={COLORS.white} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Edit Profile</Text>
+                <TouchableOpacity
+                    onPress={handleSave}
+                    disabled={isLoading || !hasChanges}
+                    style={[styles.saveBtn, (!hasChanges || isLoading) && styles.saveBtnDisabled]}
+                >
+                    <Text style={[styles.saveBtnText, (!hasChanges || isLoading) && styles.saveBtnTextDisabled]}>
+                        {isLoading ? 'Saving...' : 'Save'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Avatar */}
                 <View style={styles.avatarSection}>
-                    <Avatar
-                        source={user.avatar}
-                        name={user.full_name}
-                        size="large"
-                    />
-                    <TouchableOpacity style={styles.changePhotoBtn}>
+                    <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{initials}</Text>
+                    </View>
+                    <TouchableOpacity>
                         <Text style={styles.changePhotoText}>Change Photo</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Form */}
                 <View style={styles.form}>
-                    <Input
-                        label="First Name"
-                        placeholder="Enter first name"
-                        value={firstName}
-                        onChangeText={setFirstName}
-                        error={errors.firstName}
-                    />
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>First Name</Text>
+                        <TextInput
+                            style={[styles.input, !!errors.firstName && styles.inputError]}
+                            placeholder="Enter first name"
+                            placeholderTextColor={COLORS.lightGray}
+                            value={firstName}
+                            onChangeText={setFirstName}
+                        />
+                        {errors.firstName && <Text style={styles.errorText}>{errors.firstName}</Text>}
+                    </View>
 
-                    <Input
-                        label="Last Name"
-                        placeholder="Enter last name"
-                        value={lastName}
-                        onChangeText={setLastName}
-                    />
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Last Name</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter last name"
+                            placeholderTextColor={COLORS.lightGray}
+                            value={lastName}
+                            onChangeText={setLastName}
+                        />
+                    </View>
 
-                    <Input
-                        label="Email (Optional)"
-                        placeholder="Enter email address"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        error={errors.email}
-                    />
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Email (Optional)</Text>
+                        <TextInput
+                            style={[styles.input, !!errors.email && styles.inputError]}
+                            placeholder="Enter email address"
+                            placeholderTextColor={COLORS.lightGray}
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+                        {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+                    </View>
 
                     {/* Phone (read-only) */}
-                    <View style={styles.readOnlyField}>
-                        <Text style={styles.fieldLabel}>Phone Number</Text>
-                        <Text style={styles.fieldValue}>{user.phone}</Text>
-                        <Text style={styles.fieldHint}>Phone number cannot be changed</Text>
+                    <View style={styles.readOnlyGroup}>
+                        <Text style={styles.label}>Phone Number</Text>
+                        <View style={styles.readOnlyField}>
+                            <Icon name="phone" size={16} color={COLORS.mediumGray} />
+                            <Text style={styles.readOnlyText}>{user.phone}</Text>
+                        </View>
+                        <Text style={styles.hintText}>Phone number cannot be changed</Text>
                     </View>
                 </View>
-
-                {/* Save Button */}
-                <Button
-                    title="Save Changes"
-                    onPress={handleSave}
-                    loading={isLoading}
-                    style={styles.saveButton}
-                />
             </ScrollView>
         </SafeAreaView>
     );
@@ -144,66 +173,129 @@ const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
-    },
-    scrollContent: {
-        padding: theme.spacing.md,
-        paddingBottom: theme.spacing.xxl,
+        backgroundColor: COLORS.surface,
     },
     header: {
+        backgroundColor: COLORS.dark,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: theme.spacing.lg,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
     },
-    backText: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.primary,
-        fontWeight: '500',
+    backBtn: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: COLORS.darkGray,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    title: {
-        fontSize: theme.typography.fontSize.xl,
+    headerTitle: {
+        flex: 1,
+        fontSize: 16,
         fontWeight: '600',
-        color: colors.textPrimary,
+        color: COLORS.white,
+        marginLeft: 12,
+    },
+    saveBtn: {
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        backgroundColor: COLORS.accent,
+        borderRadius: 8,
+    },
+    saveBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.white,
+    },
+    saveBtnDisabled: {
+        backgroundColor: COLORS.darkGray,
+        opacity: 0.5,
+    },
+    saveBtnTextDisabled: {
+        color: COLORS.lightGray,
+    },
+    scrollContent: {
+        padding: 16,
+        paddingBottom: 40,
     },
     avatarSection: {
         alignItems: 'center',
-        marginBottom: theme.spacing.xl,
+        marginBottom: 24,
     },
-    changePhotoBtn: {
-        marginTop: theme.spacing.md,
+    avatar: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: COLORS.dark,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    avatarText: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: COLORS.white,
     },
     changePhotoText: {
-        color: colors.primary,
-        fontSize: theme.typography.fontSize.md,
+        fontSize: 13,
+        color: COLORS.accent,
         fontWeight: '500',
     },
     form: {
-        marginBottom: theme.spacing.xl,
+        gap: 16,
+    },
+    inputGroup: {
+        gap: 6,
+    },
+    label: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: COLORS.mediumGray,
+        marginLeft: 4,
+    },
+    input: {
+        backgroundColor: COLORS.white,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 14,
+        color: COLORS.dark,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    inputError: {
+        borderColor: COLORS.error,
+    },
+    errorText: {
+        fontSize: 11,
+        color: COLORS.error,
+        marginLeft: 4,
+    },
+    readOnlyGroup: {
+        gap: 6,
+        marginTop: 8,
     },
     readOnlyField: {
-        marginTop: theme.spacing.md,
-        paddingTop: theme.spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.divider,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: COLORS.white,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        opacity: 0.7,
     },
-    fieldLabel: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.textSecondary,
-        marginBottom: theme.spacing.xs,
+    readOnlyText: {
+        fontSize: 14,
+        color: COLORS.mediumGray,
     },
-    fieldValue: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textPrimary,
-        fontWeight: '500',
-    },
-    fieldHint: {
-        fontSize: theme.typography.fontSize.xs,
-        color: colors.textHint,
-        marginTop: theme.spacing.xs,
-    },
-    saveButton: {
-        marginTop: theme.spacing.lg,
+    hintText: {
+        fontSize: 11,
+        color: COLORS.lightGray,
+        marginLeft: 4,
     },
 });
 

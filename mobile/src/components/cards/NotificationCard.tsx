@@ -1,37 +1,48 @@
 /**
- * Notification Card Component
+ * Notification Card - Professional Minimalist Design
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Notification, NotificationType } from '../../types/models';
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
+
+const COLORS = {
+    dark: '#1a1a2e',
+    mediumGray: '#4a4a68',
+    lightGray: '#9ca3af',
+    surface: '#f8f9fa',
+    white: '#ffffff',
+    accent: '#4f46e5',
+    success: '#059669',
+    warning: '#d97706',
+    error: '#dc2626',
+    border: '#e5e7eb',
+};
 
 interface NotificationCardProps {
     notification: Notification;
     onPress?: () => void;
 }
 
-const getNotificationIcon = (type: NotificationType): { name: string, color: string } => {
+const getNotificationIcon = (type: NotificationType): { name: string; color: string; bg: string } => {
     switch (type) {
         case 'checkin':
-            return { name: 'directions-bus', color: colors.success };
+            return { name: 'directions-bus', color: COLORS.success, bg: '#dcfce7' };
         case 'checkout':
-            return { name: 'home', color: colors.info };
+            return { name: 'home', color: COLORS.dark, bg: '#f3f4f6' };
         case 'trip_started':
-            return { name: 'play-arrow', color: colors.primary };
+            return { name: 'play-arrow', color: COLORS.accent, bg: '#eef2ff' };
         case 'trip_ended':
-            return { name: 'flag', color: colors.textSecondary };
+            return { name: 'flag', color: COLORS.mediumGray, bg: '#f3f4f6' };
         case 'approaching':
-            return { name: 'schedule', color: colors.warning };
+            return { name: 'schedule', color: COLORS.warning, bg: '#fef3c7' };
         case 'delay':
-            return { name: 'warning', color: colors.error };
+            return { name: 'warning', color: COLORS.error, bg: '#fef2f2' };
         case 'emergency':
-            return { name: 'error', color: colors.error };
+            return { name: 'error', color: COLORS.error, bg: '#fef2f2' };
         default:
-            return { name: 'notifications', color: colors.primary };
+            return { name: 'notifications', color: COLORS.dark, bg: '#f3f4f6' };
     }
 };
 
@@ -48,36 +59,42 @@ const formatTime = (dateString: string): string => {
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
 
-    return date.toLocaleDateString();
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
 
 const NotificationCard: React.FC<NotificationCardProps> = ({
     notification,
     onPress,
 }) => {
+    const isUnread = !notification.is_read;
+    const iconInfo = getNotificationIcon(notification.notification_type);
+
     return (
         <TouchableOpacity
-            style={[
-                styles.container,
-                !notification.is_read && styles.unread,
-            ]}
+            style={[styles.container, isUnread && styles.unread]}
             onPress={onPress}
             activeOpacity={0.7}
         >
-            <View style={styles.iconContainer}>
-                {(() => {
-                    const { name, color } = getNotificationIcon(notification.notification_type);
-                    return <Icon name={name} size={24} color={color} />;
-                })()}
+            {/* Unread indicator bar */}
+            {isUnread && <View style={styles.unreadBar} />}
+
+            {/* Icon */}
+            <View style={[styles.iconContainer, { backgroundColor: iconInfo.bg }]}>
+                <Icon name={iconInfo.name} size={20} color={iconInfo.color} />
             </View>
+
+            {/* Content */}
             <View style={styles.content}>
-                <Text style={styles.title}>{notification.title}</Text>
+                <View style={styles.titleRow}>
+                    <Text style={[styles.title, isUnread && styles.titleUnread]} numberOfLines={1}>
+                        {notification.title}
+                    </Text>
+                    <Text style={styles.time}>{formatTime(notification.created_at)}</Text>
+                </View>
                 <Text style={styles.body} numberOfLines={2}>
                     {notification.body}
                 </Text>
-                <Text style={styles.time}>{formatTime(notification.created_at)}</Text>
             </View>
-            {!notification.is_read && <View style={styles.unreadDot} />}
         </TouchableOpacity>
     );
 };
@@ -85,50 +102,68 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
-        padding: theme.spacing.md,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
+        alignItems: 'flex-start',
+        backgroundColor: COLORS.white,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        marginBottom: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        position: 'relative',
+        overflow: 'hidden',
     },
     unread: {
-        backgroundColor: colors.primaryLight,
+        backgroundColor: '#eef2ff',
+        borderColor: COLORS.accent,
+        borderLeftWidth: 0,
+    },
+    unreadBar: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        backgroundColor: COLORS.accent,
+        borderTopLeftRadius: 12,
+        borderBottomLeftRadius: 12,
     },
     iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.background,
+        width: 40,
+        height: 40,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    icon: {
-        fontSize: 24,
-    },
     content: {
         flex: 1,
-        marginLeft: theme.spacing.md,
+        marginLeft: 12,
+    },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     title: {
-        fontSize: theme.typography.fontSize.md,
-        fontWeight: '600',
-        color: colors.textPrimary,
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '500',
+        color: COLORS.mediumGray,
+        marginRight: 8,
+    },
+    titleUnread: {
+        fontWeight: '700',
+        color: COLORS.dark,
     },
     body: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.textSecondary,
-        marginTop: theme.spacing.xs,
+        fontSize: 13,
+        color: COLORS.lightGray,
+        marginTop: 4,
+        lineHeight: 18,
     },
     time: {
-        fontSize: theme.typography.fontSize.xs,
-        color: colors.textHint,
-        marginTop: theme.spacing.sm,
-    },
-    unreadDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: colors.primary,
-        marginLeft: theme.spacing.sm,
+        fontSize: 11,
+        color: COLORS.lightGray,
     },
 });
 

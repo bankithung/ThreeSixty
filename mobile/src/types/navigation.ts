@@ -33,6 +33,7 @@ export type ParentStackParamList = {
     Settings: undefined;
     EditProfile: undefined;
     Profile: undefined;
+    Fees: undefined;
 };
 
 // ========== CONDUCTOR NAVIGATION ==========
@@ -41,6 +42,7 @@ export type ConductorStackParamList = {
     StudentList: { tripId: string };
     FaceScan: { tripId: string; eventType: 'checkin' | 'checkout' };
     TripSummary: { tripId: string };
+    Reports: undefined;
     SOS: { tripId?: string };
     Profile: undefined;
     EditProfile: undefined;

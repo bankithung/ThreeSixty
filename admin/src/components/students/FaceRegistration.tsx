@@ -5,16 +5,18 @@ import toast from 'react-hot-toast'
 
 interface FaceRegistrationProps {
     studentId: string
+    hasExistingFace?: boolean
     onSuccess?: () => void
 }
 
-const FaceRegistration: React.FC<FaceRegistrationProps> = ({ studentId, onSuccess }) => {
+const FaceRegistration: React.FC<FaceRegistrationProps> = ({ studentId, hasExistingFace = false, onSuccess }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
     const [uploadError, setUploadError] = useState<string | null>(null)
     const [isCameraActive, setIsCameraActive] = useState(false)
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
+    const [showUpdateOptions, setShowUpdateOptions] = useState(false)
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const videoRef = useRef<HTMLVideoElement>(null)
@@ -27,6 +29,8 @@ const FaceRegistration: React.FC<FaceRegistrationProps> = ({ studentId, onSucces
             stopCamera()
         }
     }, [])
+
+    // ... (keep existing helper functions like startCamera, stopCamera etc)
 
     const startCamera = async (mode: 'user' | 'environment' = facingMode) => {
         // Stop any existing stream first
@@ -43,6 +47,8 @@ const FaceRegistration: React.FC<FaceRegistrationProps> = ({ studentId, onSucces
             setTimeout(() => {
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream
+                    // Explicitly play to ensure mobile compatibility
+                    videoRef.current.play().catch(e => console.error("Play error:", e));
                 }
             }, 100)
 
@@ -141,6 +147,7 @@ const FaceRegistration: React.FC<FaceRegistrationProps> = ({ studentId, onSucces
 
             setSelectedFile(null)
             setPreviewUrl(null)
+            setShowUpdateOptions(false) // Reset view back to success state
             if (onSuccess) onSuccess()
 
         } catch (error: any) {
@@ -153,10 +160,43 @@ const FaceRegistration: React.FC<FaceRegistrationProps> = ({ studentId, onSucces
         }
     }
 
+    if (hasExistingFace && !showUpdateOptions && !isCameraActive && !selectedFile) {
+        return (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    Face Registration
+                </h2>
+
+                <div className="flex flex-col items-center justify-center py-6 bg-green-50 rounded-xl border border-green-100">
+                    <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-3">
+                        <FiCheck size={32} />
+                    </div>
+                    <h3 className="text-lg font-medium text-green-900">Face Data Registered</h3>
+                    <p className="text-sm text-green-700 mt-1 mb-4">This student can use face recognition.</p>
+
+                    <button
+                        onClick={() => setShowUpdateOptions(true)}
+                        className="text-sm text-green-700 hover:text-green-800 font-medium underline"
+                    >
+                        Update/Re-register Face
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
-                <span>Face Registration</span>
+                <span>{hasExistingFace ? 'Update Face Registration' : 'Face Registration'}</span>
+                {hasExistingFace && (
+                    <button
+                        onClick={() => setShowUpdateOptions(false)}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                        Cancel Update
+                    </button>
+                )}
             </h2>
 
             <p className="text-sm text-gray-600 mb-4">

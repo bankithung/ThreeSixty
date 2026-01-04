@@ -1,5 +1,5 @@
 /**
- * OTP Verification Screen - Using RTK Query hooks
+ * OTP Verification Screen - Minimal Monochrome Design
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -11,14 +11,28 @@ import {
     SafeAreaView,
     TouchableOpacity,
     Vibration,
+    KeyboardAvoidingView,
+    Platform,
+    TouchableWithoutFeedback,
+    Keyboard,
+    StatusBar,
 } from 'react-native';
 import { AuthScreenProps } from '../../types/navigation';
 import { useAuth } from '../../hooks';
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Button } from '../../components/common';
 import { OTP_LENGTH, OTP_RESEND_DELAY } from '../../constants/config';
+
+// Minimal Monochrome Palette
+const COLORS = {
+    dark: '#1a1a2e',
+    gray: '#6b7280',
+    lightGray: '#e5e7eb',
+    surface: '#ffffff',
+    background: '#f8f9fa',
+    error: '#ef4444',
+    text: '#1f2937',
+};
 
 const OTPScreen: React.FC<AuthScreenProps<'OTP'>> = ({ navigation, route }) => {
     const { phone } = route.params;
@@ -60,6 +74,8 @@ const OTPScreen: React.FC<AuthScreenProps<'OTP'>> = ({ navigation, route }) => {
             inputRefs.current[index + 1]?.focus();
         }
 
+        // Move to prev input on backspace is handled by onKeyPress
+
         // Auto-submit when all digits entered
         if (newOtp.every((digit) => digit) && newOtp.join('').length === OTP_LENGTH) {
             handleVerify(newOtp.join(''));
@@ -88,7 +104,6 @@ const OTPScreen: React.FC<AuthScreenProps<'OTP'>> = ({ navigation, route }) => {
             setOtp(Array(OTP_LENGTH).fill(''));
             inputRefs.current[0]?.focus();
         }
-        // If successful, Redux state will update and navigator will switch
     };
 
     const handleResend = async () => {
@@ -105,92 +120,107 @@ const OTPScreen: React.FC<AuthScreenProps<'OTP'>> = ({ navigation, route }) => {
         }
     };
 
-    const maskedPhone = phone.replace(/(\d{2})\d{6}(\d{2})/, '$1******$2');
+    const maskedPhone = phone.replace(/(\d{2})\d{6}(\d{2})/, '$1 ****** $2');
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
-                {/* Header */}
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => navigation.goBack()}
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.keyboardView}
                 >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Icon name="arrow-back" size={24} color={colors.primary} />
-                        <Text style={[styles.backText, { marginLeft: 4 }]}>Back</Text>
-                    </View>
-                </TouchableOpacity>
-
-                {/* Title */}
-                <View style={styles.headerSection}>
-                    <Text style={styles.title}>Verify OTP</Text>
-                    <Text style={styles.subtitle}>
-                        Enter the 6-digit code sent to {maskedPhone}
-                    </Text>
-                </View>
-
-                {/* OTP Inputs */}
-                <View style={styles.otpContainer}>
-                    {otp.map((digit, index) => (
-                        <TextInput
-                            key={index}
-                            ref={(ref) => (inputRefs.current[index] = ref)}
-                            style={[
-                                styles.otpInput,
-                                digit && styles.otpInputFilled,
-                                error && styles.otpInputError,
-                            ]}
-                            value={digit}
-                            onChangeText={(text) => handleOtpChange(text.slice(-1), index)}
-                            onKeyPress={({ nativeEvent }) =>
-                                handleKeyPress(nativeEvent.key, index)
-                            }
-                            keyboardType="number-pad"
-                            maxLength={1}
-                            selectTextOnFocus
-                            editable={!isVerifyingOTP}
-                        />
-                    ))}
-                </View>
-
-                {/* Error */}
-                {error && (
-                    <View style={styles.errorContainer}>
-                        <Text style={styles.error}>{error}</Text>
-                    </View>
-                )}
-
-                {/* Verify Button */}
-                <Button
-                    title="Verify"
-                    onPress={() => handleVerify()}
-                    loading={isVerifyingOTP}
-                    disabled={otp.join('').length !== OTP_LENGTH}
-                    style={styles.button}
-                />
-
-                {/* Resend */}
-                <View style={styles.resendContainer}>
-                    <Text style={styles.resendText}>Didn't receive the code? </Text>
-                    <TouchableOpacity
-                        onPress={handleResend}
-                        disabled={resendTimer > 0 || isSendingOTP}
-                    >
-                        <Text
-                            style={[
-                                styles.resendLink,
-                                (resendTimer > 0 || isSendingOTP) && styles.resendDisabled,
-                            ]}
+                    <View style={styles.content}>
+                        {/* Header */}
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={() => navigation.goBack()}
                         >
-                            {isSendingOTP
-                                ? 'Sending...'
-                                : resendTimer > 0
-                                    ? `Resend in ${resendTimer}s`
-                                    : 'Resend'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+                            <Icon name="arrow-back" size={24} color={COLORS.dark} />
+                        </TouchableOpacity>
+
+                        <View style={styles.headerSection}>
+                            <Text style={styles.title}>Enter code</Text>
+                            <Text style={styles.subtitle}>
+                                We've sent an SMS with an activation code to your phone <Text style={styles.phoneText}>{maskedPhone}</Text>
+                            </Text>
+                        </View>
+
+                        {/* OTP Inputs */}
+                        <View style={styles.otpContainer}>
+                            {otp.map((digit, index) => (
+                                <TextInput
+                                    key={index}
+                                    ref={(ref) => (inputRefs.current[index] = ref)}
+                                    style={[
+                                        styles.otpInput,
+                                        digit ? styles.otpInputFilled : null,
+                                        error ? styles.otpInputError : null,
+                                    ]}
+                                    value={digit}
+                                    onChangeText={(text) => handleOtpChange(text.slice(-1), index)}
+                                    onKeyPress={({ nativeEvent }) =>
+                                        handleKeyPress(nativeEvent.key, index)
+                                    }
+                                    keyboardType="number-pad"
+                                    maxLength={1}
+                                    selectTextOnFocus
+                                    editable={!isVerifyingOTP}
+                                    cursorColor={COLORS.dark}
+                                    selectionColor={COLORS.lightGray}
+                                />
+                            ))}
+                        </View>
+
+                        {/* Error */}
+                        {error && (
+                            <Text style={styles.errorText}>{error}</Text>
+                        )}
+
+                        <View style={styles.spacer} />
+
+                        {/* Resend */}
+                        <View style={styles.resendContainer}>
+                            <Text style={styles.resendText}>I didn't receive a code</Text>
+                            <TouchableOpacity
+                                onPress={handleResend}
+                                disabled={resendTimer > 0 || isSendingOTP}
+                            >
+                                <Text
+                                    style={[
+                                        styles.resendLink,
+                                        (resendTimer > 0 || isSendingOTP) && styles.resendDisabled,
+                                    ]}
+                                >
+                                    {isSendingOTP
+                                        ? 'Sending...'
+                                        : resendTimer > 0
+                                            ? `Resend in ${resendTimer} sec`
+                                            : 'Resend'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Verify Button */}
+                        {/* 
+                            Optional: Auto-submit is handled, but a button is good for a11y 
+                            or if user prefers clicking.
+                        */}
+                        <Button
+                            title="Verify"
+                            onPress={() => handleVerify()}
+                            loading={isVerifyingOTP}
+                            disabled={otp.join('').length !== OTP_LENGTH}
+                            style={[
+                                styles.button,
+                                otp.join('').length !== OTP_LENGTH ? styles.buttonDisabled : null
+                            ]}
+                            textStyle={styles.buttonText}
+                        />
+
+                    </View>
+                </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
         </SafeAreaView>
     );
 };
@@ -198,88 +228,111 @@ const OTPScreen: React.FC<AuthScreenProps<'OTP'>> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: COLORS.background,
+    },
+    keyboardView: {
+        flex: 1,
     },
     content: {
         flex: 1,
-        padding: theme.spacing.lg,
+        padding: 24,
     },
     backButton: {
-        marginBottom: theme.spacing.lg,
-    },
-    backText: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.primary,
-        fontWeight: '500',
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        marginBottom: 32,
     },
     headerSection: {
-        marginBottom: theme.spacing.xl,
+        marginBottom: 40,
     },
     title: {
-        fontSize: theme.typography.fontSize.xxl,
-        fontWeight: '600',
-        color: colors.textPrimary,
-        marginBottom: theme.spacing.sm,
+        fontSize: 32,
+        fontWeight: '800',
+        color: COLORS.dark,
+        letterSpacing: -1,
+        marginBottom: 12,
     },
     subtitle: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textSecondary,
+        fontSize: 15,
+        color: COLORS.gray,
+        lineHeight: 24,
+    },
+    phoneText: {
+        color: COLORS.dark,
+        fontWeight: '600',
     },
     otpContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: theme.spacing.md,
+        marginBottom: 24,
+        gap: 8,
     },
     otpInput: {
-        width: 48,
-        height: 56,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: theme.borderRadius.md,
-        backgroundColor: colors.surface,
-        fontSize: theme.typography.fontSize.xxl,
-        fontWeight: '600',
+        flex: 1,
+        height: 60,
+        borderWidth: 1.5,
+        borderColor: COLORS.lightGray,
+        borderRadius: 12,
+        backgroundColor: COLORS.surface,
+        fontSize: 24,
+        fontWeight: '700',
         textAlign: 'center',
-        color: colors.textPrimary,
+        color: COLORS.dark,
     },
     otpInputFilled: {
-        borderColor: colors.primary,
-        borderWidth: 2,
+        borderColor: COLORS.dark,
+        backgroundColor: COLORS.surface,
     },
     otpInputError: {
-        borderColor: colors.error,
-        backgroundColor: '#FFF5F5',
+        borderColor: COLORS.error,
+        backgroundColor: '#FEF2F2',
     },
-    errorContainer: {
-        backgroundColor: '#FFEBEE',
-        padding: theme.spacing.sm,
-        borderRadius: theme.borderRadius.sm,
-        marginBottom: theme.spacing.md,
-    },
-    error: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.error,
+    errorText: {
+        fontSize: 14,
+        color: COLORS.error,
         textAlign: 'center',
+        marginBottom: 16,
     },
-    button: {
-        marginTop: theme.spacing.md,
+    spacer: {
+        flex: 1,
+        minHeight: 24,
     },
     resendContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: theme.spacing.lg,
+        alignItems: 'center',
+        marginBottom: 24,
+        gap: 6,
     },
     resendText: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textSecondary,
+        fontSize: 14,
+        color: COLORS.gray,
     },
     resendLink: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.primary,
-        fontWeight: '500',
+        fontSize: 14,
+        color: COLORS.dark,
+        fontWeight: '700',
     },
     resendDisabled: {
-        color: colors.textHint,
+        color: COLORS.gray,
+        fontWeight: '400',
+    },
+    button: {
+        backgroundColor: COLORS.dark,
+        borderRadius: 12,
+        height: 52,
+        elevation: 0,
+        shadowOpacity: 0,
+    },
+    buttonDisabled: {
+        backgroundColor: COLORS.lightGray,
+        opacity: 0.5,
+    },
+    buttonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.surface,
     },
 });
 

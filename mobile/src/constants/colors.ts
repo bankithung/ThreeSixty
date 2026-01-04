@@ -42,6 +42,15 @@ export const colors = {
     border: '#E2E8F0', // Slate-200
     divider: '#E2E8F0',
 
+    // Surface variants
+    surfaceVariant: '#F1F5F9',
+
+    // Light status colors
+    successLight: '#DCFCE7',
+    infoLight: '#DBEAFE',
+    warningLight: '#FEF3C7',
+    errorLight: '#FEE2E2',
+
     // Bus Tracking
     busMarker: '#4F46E5',
     stopMarker: '#3B82F6',

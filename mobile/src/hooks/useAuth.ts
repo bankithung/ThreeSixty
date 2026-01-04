@@ -5,11 +5,14 @@
 import { useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setCheckingAuth, clearAuth, setOTPSent, clearOTP } from '../store/slices/authSlice';
+import { clearTripState } from '../store/slices/tripSlice';
+import { clearNotificationState } from '../store/slices/notificationSlice';
 import {
     useGetProfileQuery,
     useSendOTPMutation,
     useVerifyOTPMutation,
     useLogoutMutation,
+    api,
 } from '../store/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -74,7 +77,14 @@ export const useAuth = () => {
         } catch (error) {
             // Ignore logout errors
         } finally {
+            // Clear all Redux state
             dispatch(clearAuth());
+            dispatch(clearTripState());
+            dispatch(clearNotificationState());
+            dispatch(api.util.resetApiState());
+
+            // Optional: Clear AsyncStorage if you store anything else
+            // await AsyncStorage.clear(); 
         }
     }, [logoutMutation, dispatch]);
 

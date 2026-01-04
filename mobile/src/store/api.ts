@@ -165,6 +165,12 @@ export const api = createApi({
 
         getChildHistory: builder.query<Attendance[], { studentId: string; days?: number }>({
             query: ({ studentId, days = 7 }) => `/attendance/child/${studentId}/history/?days=${days}`,
+            transformResponse: (response: any) => {
+                // Handle both paginated and array responses
+                if (Array.isArray(response)) return response;
+                if (response?.results) return response.results;
+                return [];
+            },
         }),
 
         getChildTrip: builder.query<{ trip: Trip | null; latest_location: any; student_stop: any }, string>({
@@ -176,6 +182,22 @@ export const api = createApi({
         getActiveTrips: builder.query<Trip[], void>({
             query: () => '/transport/trips/active/',
             transformResponse: (response: any) => response.results || response,
+            providesTags: ['Trip'],
+        }),
+
+        getTripHistory: builder.query<{
+            results: Trip[];
+            total_count: number;
+            completed_count: number;
+            today_count: number;
+            page: number;
+            has_next: boolean;
+        }, { page?: number; status?: string } | void>({
+            query: (params) => {
+                const page = params && 'page' in params ? params.page : 1;
+                const status = params && 'status' in params ? params.status : undefined;
+                return `/transport/trips/history/?page=${page}${status ? `&status=${status}` : ''}`;
+            },
             providesTags: ['Trip'],
         }),
 
@@ -380,6 +402,7 @@ export const {
     useGetChildTripQuery,
     // Trips
     useGetActiveTripsQuery,
+    useGetTripHistoryQuery,
     useGetTripTrackingQuery,
     useStartTripMutation,
     useEndTripMutation,

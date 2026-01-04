@@ -1,11 +1,18 @@
 /**
- * Parent Navigation - Tab Navigator + Stack
+ * Parent Navigation - Professional Tab Navigator with Animations
  */
 
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    withSpring,
+    withTiming,
+    interpolate,
+} from 'react-native-reanimated';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import {
     ParentStackParamList,
@@ -16,24 +23,77 @@ import {
     TrackingScreen,
     NotificationsScreen,
     ChildDetailsScreen,
+    FeesScreen,
 } from '../screens/parent';
 import { ProfileScreen, EditProfileScreen } from '../screens/common';
-import { colors } from '../constants/colors';
 import { useGetUnreadCountQuery } from '../store/api';
 
 const Tab = createBottomTabNavigator<ParentTabParamList>();
 const Stack = createNativeStackNavigator<ParentStackParamList>();
 
-import Icon from 'react-native-vector-icons/MaterialIcons';
+// Professional muted color palette
+const COLORS = {
+    dark: '#1a1a2e',
+    mediumGray: '#4a4a68',
+    lightGray: '#9ca3af',
+    surface: '#ffffff',
+    background: '#f8f9fa',
+    accent: '#1a1a2e',
+    border: '#e5e7eb',
+};
 
-// ... (imports remain)
+// Animated Tab Icon Component
+const AnimatedTabIcon: React.FC<{
+    name: string;
+    focused: boolean;
+    label: string;
+    badge?: number;
+}> = ({ name, focused, label, badge }) => {
+    const animatedIconStyle = useAnimatedStyle(() => ({
+        transform: [
+            { scale: withSpring(focused ? 1.1 : 1, { damping: 15, stiffness: 150 }) },
+        ],
+    }));
 
-// Tab Icon Component
-const TabIcon: React.FC<{ name: string; focused: boolean }> = ({ name, focused }) => (
-    <View style={[styles.iconContainer, focused && styles.iconFocused]}>
-        <Icon name={name} size={24} color={focused ? colors.primary : colors.textHint} />
-    </View>
-);
+    const animatedContainerStyle = useAnimatedStyle(() => ({
+        backgroundColor: withTiming(focused ? `${COLORS.dark}10` : 'transparent', { duration: 200 }),
+    }));
+
+    const animatedLabelStyle = useAnimatedStyle(() => ({
+        opacity: withTiming(focused ? 1 : 0.6, { duration: 200 }),
+        transform: [
+            { translateY: withSpring(focused ? 0 : 2, { damping: 15 }) },
+        ],
+    }));
+
+    return (
+        <View style={styles.tabItemContainer}>
+            <Animated.View style={[styles.iconContainer, animatedContainerStyle]}>
+                <Animated.View style={animatedIconStyle}>
+                    <Icon
+                        name={name}
+                        size={22}
+                        color={focused ? COLORS.dark : COLORS.lightGray}
+                    />
+                </Animated.View>
+                {badge !== undefined && badge > 0 && (
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>
+                            {badge > 9 ? '9+' : badge}
+                        </Text>
+                    </View>
+                )}
+            </Animated.View>
+            <Animated.Text style={[
+                styles.tabLabel,
+                { color: focused ? COLORS.dark : COLORS.lightGray },
+                animatedLabelStyle,
+            ]}>
+                {label}
+            </Animated.Text>
+        </View>
+    );
+};
 
 // Parent Tab Navigator
 const ParentTabNavigator: React.FC = () => {
@@ -45,53 +105,55 @@ const ParentTabNavigator: React.FC = () => {
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: colors.primary,
-                tabBarInactiveTintColor: colors.textHint,
                 tabBarStyle: styles.tabBar,
-                tabBarLabelStyle: styles.tabLabel,
+                tabBarShowLabel: false,
             }}
         >
             <Tab.Screen
                 name="Home"
                 component={ParentHomeScreen}
                 options={{
-                    tabBarLabel: 'Home',
-                    tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} />,
+                    tabBarIcon: ({ focused }) => (
+                        <AnimatedTabIcon name="home" focused={focused} label="Home" />
+                    ),
                 }}
             />
             <Tab.Screen
                 name="Track"
                 component={TrackingScreen}
                 options={{
-                    tabBarLabel: 'Track',
-                    tabBarIcon: ({ focused }) => <TabIcon name="location-on" focused={focused} />,
+                    tabBarIcon: ({ focused }) => (
+                        <AnimatedTabIcon name="location-on" focused={focused} label="Track" />
+                    ),
                 }}
             />
             <Tab.Screen
                 name="Notifications"
                 component={NotificationsScreen}
                 options={{
-                    tabBarLabel: 'Alerts',
-                    tabBarIcon: ({ focused }) => <TabIcon name="notifications" focused={focused} />,
-                    tabBarBadge: unreadData?.unread_count && unreadData.unread_count > 0
-                        ? unreadData.unread_count > 9 ? '9+' : unreadData.unread_count
-                        : undefined,
+                    tabBarIcon: ({ focused }) => (
+                        <AnimatedTabIcon
+                            name="notifications"
+                            focused={focused}
+                            label="Alerts"
+                            badge={unreadData?.unread_count}
+                        />
+                    ),
                 }}
             />
             <Tab.Screen
                 name="ProfileTab"
-                component={View} // Dummy component
+                component={View}
                 listeners={({ navigation }) => ({
                     tabPress: (e) => {
-                        // Prevent default action
                         e.preventDefault();
-                        // Navigate to the Profile stack screen
                         navigation.navigate('Profile');
                     },
                 })}
                 options={{
-                    tabBarLabel: 'Profile',
-                    tabBarIcon: ({ focused }) => <TabIcon name="person" focused={focused} />,
+                    tabBarIcon: ({ focused }) => (
+                        <AnimatedTabIcon name="person" focused={focused} label="Profile" />
+                    ),
                 }}
             />
         </Tab.Navigator>
@@ -109,50 +171,61 @@ const ParentNavigator: React.FC = () => {
         >
             <Stack.Screen name="ParentTabs" component={ParentTabNavigator} />
             <Stack.Screen name="ChildDetails" component={ChildDetailsScreen} />
-            <Stack.Screen
-                name="EditProfile"
-                component={EditProfileScreen}
-                options={{ headerShown: true, title: 'Edit Profile' }}
-            />
-            <Stack.Screen
-                name="Profile"
-                component={ProfileScreen}
-                options={{ headerShown: false, title: 'Profile' }}
-            />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Fees" component={FeesScreen} />
         </Stack.Navigator>
     );
 };
 
 const styles = StyleSheet.create({
     tabBar: {
-        backgroundColor: colors.surface,
-        borderTopColor: colors.border,
-        height: 90, // Massive Increase
-        paddingBottom: 24,
-        paddingTop: 16,
-        elevation: 16,
+        backgroundColor: COLORS.surface,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        height: Platform.OS === 'ios' ? 85 : 70,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+        elevation: 0,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: -1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
     },
-    tabLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    iconContainer: {
-        width: 48,
-        height: 48,
+    tabItemContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 24,
+        gap: 4,
     },
-    iconFocused: {
-        backgroundColor: colors.indigo50,
+    iconContainer: {
+        width: 44,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 16,
+        position: 'relative',
     },
-    icon: {
-        fontSize: 30, // Much larger icons
+    tabLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        letterSpacing: 0.2,
+    },
+    badge: {
+        position: 'absolute',
+        top: -2,
+        right: 2,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#ef4444',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    badgeText: {
+        fontSize: 9,
+        fontWeight: '700',
+        color: '#ffffff',
     },
 });
 

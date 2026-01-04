@@ -12,6 +12,7 @@ from .views import (
     StopDetailView,
     TripListView,
     ActiveTripsView,
+    ConductorTripHistoryView,
     StartTripView,
     EndTripView,
     UpdateLocationView,
@@ -36,6 +37,7 @@ urlpatterns = [
     # Trips
     path('trips/', TripListView.as_view(), name='trip-list'),
     path('trips/active/', ActiveTripsView.as_view(), name='active-trips'),
+    path('trips/history/', ConductorTripHistoryView.as_view(), name='conductor-trip-history'),
     path('trips/start/', StartTripView.as_view(), name='start-trip'),
     path('trips/<uuid:pk>/end/', EndTripView.as_view(), name='end-trip'),
     path('trips/<uuid:pk>/location/', UpdateLocationView.as_view(), name='update-location'),

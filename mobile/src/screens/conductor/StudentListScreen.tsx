@@ -1,5 +1,6 @@
 /**
- * Student List Screen for Conductor - Shows all students on route
+ * Student List Screen - Professional Minimalist Design
+ * Matches the conductor dashboard aesthetic
  */
 
 import React, { useCallback, useState, useMemo } from 'react';
@@ -13,6 +14,7 @@ import {
     TextInput,
     Alert,
     Animated,
+    StatusBar,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { ConductorScreenProps } from '../../types/navigation';
@@ -22,10 +24,23 @@ import {
 } from '../../store/api';
 import { useAppDispatch, useLocation } from '../../hooks';
 import { updateStudentStatus } from '../../store/slices/tripSlice';
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Card, Avatar, LoadingSpinner, Button } from '../../components/common';
+import { Avatar, LoadingSpinner } from '../../components/common';
+
+// Professional color palette (matching ConductorHomeScreen)
+const COLORS = {
+    dark: '#1a1a2e',
+    darkGray: '#2d2d44',
+    mediumGray: '#4a4a68',
+    lightGray: '#8a8aa3',
+    surface: '#f8f9fa',
+    white: '#ffffff',
+    accent: '#4f46e5',
+    success: '#059669',
+    warning: '#d97706',
+    error: '#dc2626',
+    border: '#e5e7eb',
+};
 
 interface StudentAttendance {
     student: {
@@ -51,32 +66,28 @@ const StudentListScreen: React.FC<ConductorScreenProps<'StudentList'>> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<'all' | 'not_boarded' | 'on_bus' | 'dropped'>('all');
 
-    // Get current location for manual attendance
-    const { location, getCurrentLocation } = useLocation();
+    const { getCurrentLocation } = useLocation();
 
-    // RTK Query hooks
     const {
         data: attendanceData,
         isLoading,
         isFetching,
         refetch,
     } = useGetTripAttendanceQuery(tripId, {
-        pollingInterval: 10000, // Refresh every 10s
+        pollingInterval: 10000,
     });
 
-    const [manualAttendance, { isLoading: isMarking }] = useManualAttendanceMutation();
+    const [manualAttendance] = useManualAttendanceMutation();
 
     const students: StudentAttendance[] = useMemo(() => {
         if (!attendanceData?.students) return [];
 
         let filtered = attendanceData.students;
 
-        // Apply status filter
         if (filter !== 'all') {
             filtered = filtered.filter((s: StudentAttendance) => s.status === filter);
         }
 
-        // Apply search filter
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter((s: StudentAttendance) =>
@@ -101,17 +112,15 @@ const StudentListScreen: React.FC<ConductorScreenProps<'StudentList'>> = ({
         studentName: string
     ) => {
         Alert.alert(
-            `Manual ${eventType === 'checkin' ? 'Check-In' : 'Check-Out'}`,
-            `Mark ${studentName} as ${eventType === 'checkin' ? 'boarded' : 'dropped'}?`,
+            eventType === 'checkin' ? 'Board Student' : 'Drop Student',
+            `Confirm ${studentName} as ${eventType === 'checkin' ? 'boarded' : 'dropped'}?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Confirm',
                     onPress: async () => {
                         try {
-                            // Get current location
                             const loc = await getCurrentLocation();
-
                             await manualAttendance({
                                 tripId,
                                 studentId,
@@ -121,12 +130,10 @@ const StudentListScreen: React.FC<ConductorScreenProps<'StudentList'>> = ({
                                 notes: 'Manual attendance',
                             }).unwrap();
 
-                            // Update local state
                             dispatch(updateStudentStatus({
                                 studentId,
                                 status: eventType === 'checkin' ? 'on_bus' : 'dropped',
                             }));
-
                             refetch();
                         } catch (error: any) {
                             Alert.alert('Error', error?.data?.detail || 'Failed to mark attendance');
@@ -141,219 +148,188 @@ const StudentListScreen: React.FC<ConductorScreenProps<'StudentList'>> = ({
         navigation.navigate('FaceScan', { tripId, eventType });
     }, [tripId, navigation]);
 
-    const getStatusColor = (status: string) => {
+    const getStatusInfo = (status: string) => {
         switch (status) {
-            case 'on_bus': return colors.success;
-            case 'dropped': return colors.info;
-            default: return colors.textHint;
+            case 'on_bus':
+                return { color: COLORS.success, label: 'On Bus', icon: 'directions-bus' };
+            case 'dropped':
+                return { color: COLORS.accent, label: 'Dropped', icon: 'check-circle' };
+            default:
+                return { color: COLORS.warning, label: 'Pending', icon: 'schedule' };
         }
     };
 
-    const getStatusText = (status: string) => {
-        switch (status) {
-            case 'on_bus': return 'On Bus';
-            case 'dropped': return 'Dropped';
-            default: return 'Pending';
-        }
-    };
+    const renderLeftActions = (
+        progress: Animated.AnimatedInterpolation<number>,
+        dragX: Animated.AnimatedInterpolation<number>,
+        item: StudentAttendance
+    ) => {
+        if (item.status !== 'not_boarded') return null;
 
-    // Swipeable Actions
-    const renderLeftActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>, item: StudentAttendance) => {
         const trans = dragX.interpolate({
             inputRange: [0, 50, 100],
             outputRange: [-20, 0, 0],
         });
 
-        if (item.status !== 'not_boarded') return null;
-
         return (
             <TouchableOpacity
-                style={styles.leftAction}
+                style={styles.swipeAction}
                 onPress={() => handleManualAttendance(item.student.id, 'checkin', item.student.first_name)}
             >
-                <Animated.View style={[styles.actionContent, { transform: [{ translateX: trans }] }]}>
-                    <Icon name="check" size={24} color={colors.white} />
-                    <Text style={styles.actionText}>Board</Text>
+                <Animated.View style={[styles.swipeContent, { transform: [{ translateX: trans }] }]}>
+                    <Icon name="login" size={20} color={COLORS.white} />
+                    <Text style={styles.swipeText}>Board</Text>
                 </Animated.View>
             </TouchableOpacity>
         );
     };
 
-    const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>, item: StudentAttendance) => {
+    const renderRightActions = (
+        progress: Animated.AnimatedInterpolation<number>,
+        dragX: Animated.AnimatedInterpolation<number>,
+        item: StudentAttendance
+    ) => {
+        if (item.status !== 'on_bus') return null;
+
         const trans = dragX.interpolate({
             inputRange: [-100, -50, 0],
             outputRange: [0, 0, 20],
         });
 
-        if (item.status !== 'on_bus') return null;
-
         return (
             <TouchableOpacity
-                style={styles.rightAction}
+                style={[styles.swipeAction, styles.swipeActionRight]}
                 onPress={() => handleManualAttendance(item.student.id, 'checkout', item.student.first_name)}
             >
-                <Animated.View style={[styles.actionContent, { transform: [{ translateX: trans }] }]}>
-                    <Icon name="logout" size={24} color={colors.white} />
-                    <Text style={styles.actionText}>Drop</Text>
+                <Animated.View style={[styles.swipeContent, { transform: [{ translateX: trans }] }]}>
+                    <Icon name="logout" size={20} color={COLORS.white} />
+                    <Text style={styles.swipeText}>Drop</Text>
                 </Animated.View>
             </TouchableOpacity>
         );
     };
 
-    const renderStudent = useCallback(({ item }: { item: StudentAttendance }) => (
-        <Swipeable
-            renderLeftActions={(p, d) => renderLeftActions(p, d, item)}
-            renderRightActions={(p, d) => renderRightActions(p, d, item)}
-            containerStyle={styles.swipeContainer}
-        >
-            <Card style={styles.studentCard}>
-                <View style={styles.studentRow}>
+    const renderStudent = useCallback(({ item }: { item: StudentAttendance }) => {
+        const statusInfo = getStatusInfo(item.status);
+
+        return (
+            <Swipeable
+                renderLeftActions={(p, d) => renderLeftActions(p, d, item)}
+                renderRightActions={(p, d) => renderRightActions(p, d, item)}
+                containerStyle={styles.swipeContainer}
+            >
+                <View style={styles.studentCard}>
                     <Avatar
                         source={item.student.photo}
                         name={item.student.full_name}
-                        size="medium"
+                        size="small"
                     />
                     <View style={styles.studentInfo}>
-                        <Text style={styles.studentName}>{item.student.full_name}</Text>
-                        <Text style={styles.studentGrade}>
-                            Grade {item.student.grade}
-                            {item.student.section ? ` - ${item.student.section}` : ''}
+                        <Text style={styles.studentName} numberOfLines={1}>
+                            {item.student.full_name}
                         </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                            <Icon name="place" size={14} color={colors.primary} />
-                            <Text style={[styles.studentStop, { marginTop: 0, marginLeft: 2 }]}>{item.student.stop_name}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.statusContainer}>
-                        <View
-                            style={[
-                                styles.statusBadge,
-                                { backgroundColor: getStatusColor(item.status) + '20' },
-                            ]}
-                        >
-                            <View
-                                style={[
-                                    styles.statusDot,
-                                    { backgroundColor: getStatusColor(item.status) },
-                                ]}
-                            />
-                            <Text
-                                style={[
-                                    styles.statusText,
-                                    { color: getStatusColor(item.status) },
-                                ]}
-                            >
-                                {getStatusText(item.status)}
+                        <View style={styles.studentMeta}>
+                            <Text style={styles.studentGrade}>
+                                {item.student.grade}{item.student.section ? `-${item.student.section}` : ''}
+                            </Text>
+                            <View style={styles.dot} />
+                            <Text style={styles.studentStop} numberOfLines={1}>
+                                {item.student.stop_name}
                             </Text>
                         </View>
-                        {/* Swipe Hint */}
-                        {item.status === 'not_boarded' && (
-                            <View style={styles.swipeHint}>
-                                <Icon name="keyboard-arrow-right" size={16} color={colors.textHint} />
-                                <Text style={styles.swipeHintText}>Swipe Right</Text>
-                            </View>
-                        )}
-                        {item.status === 'on_bus' && (
-                            <View style={styles.swipeHint}>
-                                <Text style={styles.swipeHintText}>Swipe Left</Text>
-                                <Icon name="keyboard-arrow-left" size={16} color={colors.textHint} />
-                            </View>
-                        )}
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15' }]}>
+                        <Icon name={statusInfo.icon} size={12} color={statusInfo.color} />
+                        <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                            {statusInfo.label}
+                        </Text>
                     </View>
                 </View>
-            </Card>
-        </Swipeable>
-    ), [handleManualAttendance]);
+            </Swipeable>
+        );
+    }, [handleManualAttendance]);
 
     if (isLoading) {
         return <LoadingSpinner fullScreen text="Loading students..." />;
     }
 
+    const filterOptions = [
+        { key: 'all', label: 'All', count: stats.total },
+        { key: 'not_boarded', label: 'Pending', count: stats.notBoarded },
+        { key: 'on_bus', label: 'On Bus', count: stats.onBus },
+        { key: 'dropped', label: 'Dropped', count: stats.dropped },
+    ] as const;
+
     return (
         <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.dark} />
+
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon name="arrow-back" size={24} color={colors.primary} />
-                    <Text style={[styles.backText, { marginLeft: 4 }]}>Back</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>Students</Text>
-                <View style={{ width: 50 }} />
-            </View>
+                <View style={styles.headerTop}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                        <Icon name="arrow-back" size={22} color={COLORS.white} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Students</Text>
+                    <View style={styles.headerCount}>
+                        <Text style={styles.headerCountText}>
+                            {stats.onBus}/{stats.total}
+                        </Text>
+                    </View>
+                </View>
 
-            {/* Stats Bar */}
-            <View style={styles.statsBar}>
-                <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{stats.total}</Text>
-                    <Text style={styles.statLabel}>Total</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: colors.warning }]}>{stats.notBoarded}</Text>
-                    <Text style={styles.statLabel}>Pending</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: colors.success }]}>{stats.onBus}</Text>
-                    <Text style={styles.statLabel}>On Bus</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: colors.info }]}>{stats.dropped}</Text>
-                    <Text style={styles.statLabel}>Dropped</Text>
-                </View>
-            </View>
-
-            {/* Search & Filter */}
-            <View style={styles.controls}>
+                {/* Search */}
                 <View style={styles.searchContainer}>
-                    <Icon name="search" size={20} color={colors.textHint} style={{ marginRight: theme.spacing.sm }} />
+                    <Icon name="search" size={18} color={COLORS.lightGray} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Search students..."
+                        placeholder="Search by name or stop..."
+                        placeholderTextColor={COLORS.lightGray}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
-                        placeholderTextColor={colors.textHint}
                     />
                     {searchQuery.length > 0 && (
                         <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Icon name="close" size={16} color={colors.textHint} style={{ padding: theme.spacing.xs }} />
+                            <Icon name="close" size={16} color={COLORS.lightGray} />
                         </TouchableOpacity>
                     )}
                 </View>
-
-                <View style={styles.filterRow}>
-                    {(['all', 'not_boarded', 'on_bus', 'dropped'] as const).map((f) => (
-                        <TouchableOpacity
-                            key={f}
-                            style={[styles.filterChip, filter === f && styles.filterChipActive]}
-                            onPress={() => setFilter(f)}
-                        >
-                            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-                                {f === 'all' ? 'All' :
-                                    f === 'not_boarded' ? 'Pending' :
-                                        f === 'on_bus' ? 'On Bus' : 'Dropped'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
             </View>
 
-            {/* Face Scan Buttons */}
-            <View style={styles.scanButtons}>
-                <Button
-                    title="Scan Check-In"
-                    icon={<Icon name="camera-alt" size={20} color={colors.white} />}
+            {/* Filter Tabs */}
+            <View style={styles.filterContainer}>
+                {filterOptions.map((f) => (
+                    <TouchableOpacity
+                        key={f.key}
+                        style={[styles.filterTab, filter === f.key && styles.filterTabActive]}
+                        onPress={() => setFilter(f.key)}
+                    >
+                        <Text style={[styles.filterLabel, filter === f.key && styles.filterLabelActive]}>
+                            {f.label}
+                        </Text>
+                        <Text style={[styles.filterCount, filter === f.key && styles.filterCountActive]}>
+                            {f.count}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            {/* Scan Buttons */}
+            <View style={styles.scanRow}>
+                <TouchableOpacity
+                    style={styles.scanButton}
                     onPress={() => handleFaceScan('checkin')}
-                    variant="primary"
-                    size="small"
-                    style={styles.scanBtn}
-                />
-                <Button
-                    title="Scan Check-Out"
-                    icon={<Icon name="logout" size={20} color={colors.white} />}
+                >
+                    <Icon name="camera-alt" size={18} color={COLORS.dark} />
+                    <Text style={styles.scanLabel}>Check In</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.scanButton, styles.scanButtonAlt]}
                     onPress={() => handleFaceScan('checkout')}
-                    variant="secondary"
-                    size="small"
-                    style={styles.scanBtn}
-                />
+                >
+                    <Icon name="logout" size={18} color={COLORS.white} />
+                    <Text style={[styles.scanLabel, { color: COLORS.white }]}>Check Out</Text>
+                </TouchableOpacity>
             </View>
 
             {/* Student List */}
@@ -363,18 +339,20 @@ const StudentListScreen: React.FC<ConductorScreenProps<'StudentList'>> = ({
                 keyExtractor={(item) => item.student.id}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <Icon name="people-outline" size={48} color={colors.textSecondary} style={{ marginBottom: theme.spacing.md }} />
-                        <Text style={styles.emptyText}>
+                    <View style={styles.emptyState}>
+                        <Icon name="people-outline" size={48} color={COLORS.border} />
+                        <Text style={styles.emptyTitle}>No students found</Text>
+                        <Text style={styles.emptySubtitle}>
                             {searchQuery || filter !== 'all'
-                                ? 'No students match your filter'
-                                : 'No students on this route'
-                            }
+                                ? 'Try adjusting your filters'
+                                : 'No students assigned to this route'}
                         </Text>
                     </View>
                 }
                 refreshing={isFetching}
                 onRefresh={refetch}
+                showsVerticalScrollIndicator={false}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
         </SafeAreaView>
     );
@@ -383,225 +361,222 @@ const StudentListScreen: React.FC<ConductorScreenProps<'StudentList'>> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: COLORS.surface,
     },
     header: {
+        backgroundColor: COLORS.dark,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 16,
+    },
+    headerTop: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        padding: theme.spacing.md,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
+        marginBottom: 14,
     },
-    backText: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.primary,
-        fontWeight: '500',
+    backBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: COLORS.darkGray,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    title: {
-        fontSize: theme.typography.fontSize.xl,
-        fontWeight: '600',
-        color: colors.textPrimary,
-    },
-    statsBar: {
-        flexDirection: 'row',
-        backgroundColor: colors.surface,
-        paddingVertical: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
-    },
-    statItem: {
+    headerTitle: {
         flex: 1,
-        alignItems: 'center',
-    },
-    statNumber: {
-        fontSize: theme.typography.fontSize.xl,
+        fontSize: 18,
         fontWeight: '600',
-        color: colors.textPrimary,
+        color: COLORS.white,
+        marginLeft: 12,
     },
-    statLabel: {
-        fontSize: theme.typography.fontSize.xs,
-        color: colors.textSecondary,
-        marginTop: 2,
+    headerCount: {
+        backgroundColor: COLORS.darkGray,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
     },
-    controls: {
-        padding: theme.spacing.md,
-        backgroundColor: colors.surface,
+    headerCountText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.white,
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.background,
-        borderRadius: theme.borderRadius.md,
-        paddingHorizontal: theme.spacing.md,
-        marginBottom: theme.spacing.sm,
-    },
-    searchIcon: {
-        fontSize: 16,
-        marginRight: theme.spacing.sm,
+        backgroundColor: COLORS.darkGray,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
     },
     searchInput: {
         flex: 1,
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textPrimary,
-        paddingVertical: theme.spacing.sm,
-    },
-    clearIcon: {
         fontSize: 14,
-        color: colors.textHint,
-        padding: theme.spacing.xs,
+        color: COLORS.white,
+        marginLeft: 8,
+        padding: 0,
     },
-    filterRow: {
+    filterContainer: {
         flexDirection: 'row',
-        gap: theme.spacing.sm,
-    },
-    filterChip: {
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.xs,
-        borderRadius: theme.borderRadius.full,
-        backgroundColor: colors.background,
-    },
-    filterChipActive: {
-        backgroundColor: colors.primary,
-    },
-    filterText: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.textSecondary,
-    },
-    filterTextActive: {
-        color: colors.white,
-        fontWeight: '500',
-    },
-    scanButtons: {
-        flexDirection: 'row',
-        gap: theme.spacing.md,
-        padding: theme.spacing.md,
-        backgroundColor: colors.surface,
+        backgroundColor: COLORS.white,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
+        borderBottomColor: COLORS.border,
     },
-    scanBtn: {
+    filterTab: {
         flex: 1,
-    },
-    listContent: {
-        padding: theme.spacing.md,
-        paddingBottom: theme.spacing.xxl,
-    },
-    studentCard: {
-        marginBottom: theme.spacing.md,
-    },
-    studentRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        borderRadius: 8,
+        gap: 4,
+    },
+    filterTabActive: {
+        backgroundColor: COLORS.dark,
+    },
+    filterLabel: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: COLORS.mediumGray,
+    },
+    filterLabelActive: {
+        color: COLORS.white,
+    },
+    filterCount: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: COLORS.lightGray,
+    },
+    filterCountActive: {
+        color: COLORS.lightGray,
+    },
+    scanRow: {
+        flexDirection: 'row',
+        padding: 12,
+        gap: 10,
+        backgroundColor: COLORS.white,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    scanButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: COLORS.surface,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        gap: 6,
+    },
+    scanButtonAlt: {
+        backgroundColor: COLORS.dark,
+        borderColor: COLORS.dark,
+    },
+    scanLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.dark,
+    },
+    listContent: {
+        padding: 12,
+    },
+    separator: {
+        height: 8,
+    },
+    swipeContainer: {
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    studentCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        padding: 14,
+        borderRadius: 12,
     },
     studentInfo: {
         flex: 1,
-        marginLeft: theme.spacing.md,
+        marginLeft: 12,
     },
     studentName: {
-        fontSize: theme.typography.fontSize.md,
+        fontSize: 15,
         fontWeight: '600',
-        color: colors.textPrimary,
+        color: COLORS.dark,
+    },
+    studentMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 3,
     },
     studentGrade: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.textSecondary,
-        marginTop: 2,
+        fontSize: 12,
+        color: COLORS.lightGray,
+        fontWeight: '500',
+    },
+    dot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: COLORS.lightGray,
+        marginHorizontal: 6,
     },
     studentStop: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.primary,
-        marginTop: 2,
-    },
-    statusContainer: {
-        alignItems: 'flex-end',
+        fontSize: 12,
+        color: COLORS.lightGray,
+        flex: 1,
     },
     statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: theme.spacing.sm,
-        paddingVertical: theme.spacing.xs,
-        borderRadius: theme.borderRadius.sm,
-    },
-    statusDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginRight: theme.spacing.xs,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 6,
+        gap: 4,
     },
     statusText: {
-        fontSize: theme.typography.fontSize.xs,
-        fontWeight: '500',
-    },
-    actionRow: {
-        marginTop: theme.spacing.md,
-        paddingTop: theme.spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.divider,
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-    },
-    actionBtn: {
-        minWidth: 100,
-    },
-    completedText: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.success,
-        fontWeight: '500',
-    },
-    empty: {
-        alignItems: 'center',
-        padding: theme.spacing.xxl,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: theme.spacing.md,
-    },
-    emptyText: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textSecondary,
-        textAlign: 'center',
-    },
-    swipeContainer: {
-        marginBottom: theme.spacing.md,
-    },
-    leftAction: {
-        backgroundColor: colors.success,
-        justifyContent: 'center',
-        flex: 1,
-        marginBottom: theme.spacing.md,
-        marginLeft: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
-    },
-    rightAction: {
-        backgroundColor: colors.primary,
-        justifyContent: 'center',
-        alignItems: 'flex-end',
-        flex: 1,
-        marginBottom: theme.spacing.md,
-        marginRight: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
-    },
-    actionContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: theme.spacing.xl,
-    },
-    actionText: {
-        color: colors.white,
+        fontSize: 11,
         fontWeight: '600',
-        paddingHorizontal: 8,
     },
-    swipeHint: {
-        flexDirection: 'row',
+    swipeAction: {
+        backgroundColor: COLORS.dark,
+        justifyContent: 'center',
+        borderRadius: 12,
+        marginRight: 8,
+        width: 80,
+    },
+    swipeActionRight: {
+        marginRight: 0,
+        marginLeft: 8,
+        backgroundColor: COLORS.darkGray,
+    },
+    swipeContent: {
         alignItems: 'center',
-        marginTop: 4,
+        justifyContent: 'center',
+        gap: 4,
     },
-    swipeHintText: {
-        fontSize: 10,
-        color: colors.textHint,
+    swipeText: {
+        color: COLORS.white,
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.mediumGray,
+        marginTop: 16,
+    },
+    emptySubtitle: {
+        fontSize: 13,
+        color: COLORS.lightGray,
+        marginTop: 4,
     },
 });
 

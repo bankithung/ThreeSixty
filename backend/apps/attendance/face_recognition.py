@@ -4,7 +4,8 @@ Face recognition utilities for attendance.
 import logging
 import numpy as np
 from io import BytesIO
-from PIL import Image
+from io import BytesIO
+from PIL import Image, ImageOps
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ def generate_face_encoding(image_file):
         # Read image
         image_data = image_file.read()
         image = Image.open(BytesIO(image_data))
+        image = ImageOps.exif_transpose(image)
         
         # Convert to RGB if necessary
         if image.mode != 'RGB':
@@ -149,6 +151,7 @@ def match_face(image_file, student_encodings, tolerance=None):
         # Read image
         image_data = image_file.read()
         image = Image.open(BytesIO(image_data))
+        image = ImageOps.exif_transpose(image)
         
         if image.mode != 'RGB':
             image = image.convert('RGB')
@@ -199,7 +202,13 @@ def match_face(image_file, student_encodings, tolerance=None):
         # Convert distance to confidence (0 = perfect match, 1 = no match)
         confidence = 1 - best_distance
         
+        # Convert distance to confidence (0 = perfect match, 1 = no match)
+        confidence = 1 - best_distance
+        
+        logger.info(f"Face match result: distance={best_distance:.4f}, confidence={confidence:.4f}, tolerance={tolerance}")
+        
         if best_distance <= tolerance and confidence >= min_confidence:
+            logger.info(f"Match found: student_id={best_match}")
             return {
                 'success': True,
                 'student_id': best_match,
@@ -207,6 +216,7 @@ def match_face(image_file, student_encodings, tolerance=None):
                 'error': None
             }
         else:
+            logger.warning(f"No match found: best_distance={best_distance:.4f} > tolerance={tolerance}")
             return {
                 'success': False,
                 'student_id': None,
@@ -257,7 +267,9 @@ def verify_face(image_file, known_encoding, tolerance=None):
         # Read image
         image_data = image_file.read()
         image = Image.open(BytesIO(image_data))
+        image = ImageOps.exif_transpose(image)
         
+        # Convert to RGB if necessary
         if image.mode != 'RGB':
             image = image.convert('RGB')
         

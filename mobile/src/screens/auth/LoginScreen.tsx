@@ -1,5 +1,5 @@
 /**
- * Login Screen - Using RTK Query hooks
+ * Login Screen - Minimal Professional Design
  */
 
 import React, { useState, useEffect } from 'react';
@@ -10,12 +10,27 @@ import {
     KeyboardAvoidingView,
     Platform,
     SafeAreaView,
+    StatusBar,
+    TouchableWithoutFeedback,
+    Keyboard,
+    TouchableOpacity,
 } from 'react-native';
 import { AuthScreenProps } from '../../types/navigation';
 import { useAuth } from '../../hooks';
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
 import { Button, Input } from '../../components/common';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+
+// Minimal Color Palette
+const COLORS = {
+    dark: '#1a1a2e',
+    gray: '#6b7280',
+    lightGray: '#9ca3af',
+    surface: '#ffffff',
+    background: '#f8f9fa',
+    accent: '#4f46e5',
+    border: '#e5e7eb',
+    error: '#ef4444',
+};
 
 const LoginScreen: React.FC<AuthScreenProps<'Login'>> = ({ navigation }) => {
     const { sendOTP, isSendingOTP, sendOTPError, otpSent, otpPhone } = useAuth();
@@ -45,61 +60,65 @@ const LoginScreen: React.FC<AuthScreenProps<'Login'>> = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardView}
-            >
-                <View style={styles.content}>
-                    {/* Logo Section */}
-                    <View style={styles.logoSection}>
-                        <View style={styles.logoPlaceholder}>
-                            <Text style={styles.logoText}>360°</Text>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.keyboardView}
+                >
+                    <View style={styles.content}>
+
+                        {/* Header / Branding */}
+                        <View style={styles.header}>
+                            <View style={styles.brandRow}>
+                                <Icon name="school" size={28} color={COLORS.dark} />
+                                <Text style={styles.brandText}>ThreeSixty</Text>
+                            </View>
+                            <Text style={styles.welcomeText}>Welcome back</Text>
+                            <Text style={styles.subtitleText}>Enter your mobile number to login</Text>
                         </View>
-                        <Text style={styles.title}>ThreeSixty</Text>
-                        <Text style={styles.subtitle}>School Bus Tracking</Text>
+
+                        {/* Form */}
+                        <View style={styles.form}>
+                            <Input
+                                label="Phone Number"
+                                placeholder="98765 43210"
+                                keyboardType="number-pad"
+                                value={phone}
+                                onChangeText={(text) => {
+                                    setPhone(text);
+                                    setError(null);
+                                }}
+                                maxLength={10}
+                                error={error || sendOTPError || undefined}
+                                leftIcon={<Text style={styles.countryCode}>+91</Text>}
+                                containerStyle={styles.inputContainer}
+                            />
+
+                            <Button
+                                title="Continue"
+                                onPress={handleSendOTP}
+                                loading={isSendingOTP}
+                                disabled={phone.length < 10}
+                                style={[
+                                    styles.button,
+                                    phone.length < 10 ? styles.buttonDisabled : {}
+                                ]}
+                                textStyle={styles.buttonText}
+                            />
+                        </View>
+
+                        {/* Footer */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>
+                                By continuing, you agree to our{'\n'}
+                                <Text style={styles.link}>Terms of Service</Text> and{' '}
+                                <Text style={styles.link}>Privacy Policy</Text>
+                            </Text>
+                        </View>
                     </View>
-
-                    {/* Form Section */}
-                    <View style={styles.formSection}>
-                        <Text style={styles.heading}>Welcome</Text>
-                        <Text style={styles.description}>
-                            Enter your phone number to continue
-                        </Text>
-
-                        <Input
-                            label="Phone Number"
-                            placeholder="Enter your phone number"
-                            keyboardType="phone-pad"
-                            value={phone}
-                            onChangeText={(text) => {
-                                setPhone(text);
-                                setError(null);
-                            }}
-                            maxLength={15}
-                            error={error || sendOTPError || undefined}
-                            leftIcon={<Text style={styles.countryCode}>+91</Text>}
-                        />
-
-                        <Button
-                            title="Continue"
-                            onPress={handleSendOTP}
-                            loading={isSendingOTP}
-                            disabled={phone.length < 10}
-                            style={styles.button}
-                        />
-                    </View>
-
-                    {/* Footer */}
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>
-                            By continuing, you agree to our{' '}
-                            <Text style={styles.link}>Terms of Service</Text>
-                            {' '}and{' '}
-                            <Text style={styles.link}>Privacy Policy</Text>
-                        </Text>
-                    </View>
-                </View>
-            </KeyboardAvoidingView>
+                </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
         </SafeAreaView>
     );
 };
@@ -107,79 +126,86 @@ const LoginScreen: React.FC<AuthScreenProps<'Login'>> = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: COLORS.background,
     },
     keyboardView: {
         flex: 1,
     },
     content: {
         flex: 1,
-        padding: theme.spacing.lg,
-        justifyContent: 'space-between',
-    },
-    logoSection: {
-        alignItems: 'center',
-        marginTop: theme.spacing.xxl,
-    },
-    logoPlaceholder: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
+        padding: 24,
         justifyContent: 'center',
     },
-    logoText: {
+    header: {
+        marginBottom: 40,
+    },
+    brandRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 24,
+        gap: 8,
+    },
+    brandText: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: COLORS.dark,
+        letterSpacing: -0.5,
+    },
+    welcomeText: {
         fontSize: 32,
-        fontWeight: 'bold',
-        color: colors.white,
+        fontWeight: '800',
+        color: COLORS.dark,
+        letterSpacing: -1,
+        marginBottom: 8,
     },
-    title: {
-        fontSize: theme.typography.fontSize.xxxl,
-        fontWeight: 'bold',
-        color: colors.textPrimary,
-        marginTop: theme.spacing.md,
+    subtitleText: {
+        fontSize: 15,
+        color: COLORS.gray,
+        fontWeight: '500',
     },
-    subtitle: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textSecondary,
-        marginTop: theme.spacing.xs,
+    form: {
+        gap: 20,
     },
-    formSection: {
-        flex: 1,
-        justifyContent: 'center',
-    },
-    heading: {
-        fontSize: theme.typography.fontSize.xxl,
-        fontWeight: '600',
-        color: colors.textPrimary,
-        marginBottom: theme.spacing.sm,
-    },
-    description: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textSecondary,
-        marginBottom: theme.spacing.lg,
+    inputContainer: {
+        marginBottom: 0,
     },
     countryCode: {
-        fontSize: theme.typography.fontSize.md,
-        color: colors.textPrimary,
-        fontWeight: '500',
+        fontSize: 15,
+        fontWeight: '600',
+        color: COLORS.dark,
+        marginRight: 4,
     },
     button: {
-        marginTop: theme.spacing.md,
+        backgroundColor: COLORS.dark,
+        borderRadius: 12,
+        height: 52,
+        elevation: 0,
+        shadowOpacity: 0,
+        marginTop: 8,
+    },
+    buttonDisabled: {
+        backgroundColor: COLORS.lightGray,
+        opacity: 0.5,
+    },
+    buttonText: {
+        fontSize: 16,
+        fontWeight: '600',
     },
     footer: {
-        paddingVertical: theme.spacing.lg,
+        position: 'absolute',
+        bottom: 40,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
     },
     footerText: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 12,
+        color: COLORS.lightGray,
         textAlign: 'center',
-        lineHeight: 20,
     },
     link: {
-        color: colors.primary,
-        fontWeight: '500',
+        color: COLORS.dark,
+        fontWeight: '600',
     },
 });
 

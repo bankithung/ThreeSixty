@@ -85,7 +85,7 @@ class StudentListSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'id', 'admission_number', 'first_name', 'last_name', 'full_name', 
-            'grade', 'section', 'photo', 'route_name', 'is_active', 'has_face',
+            'grade', 'section', 'photo', 'route', 'route_name', 'is_active', 'has_face',
             'school', 'pickup_address', 'pickup_latitude', 'pickup_longitude'
         ]
     

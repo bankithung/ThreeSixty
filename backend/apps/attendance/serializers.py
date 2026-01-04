@@ -27,8 +27,8 @@ class FaceScanSerializer(serializers.Serializer):
     trip_id = serializers.UUIDField()
     event_type = serializers.ChoiceField(choices=EventType.choices)
     photo = serializers.ImageField()
-    latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False)
-    longitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False)
+    latitude = serializers.DecimalField(max_digits=20, decimal_places=15, required=False)
+    longitude = serializers.DecimalField(max_digits=20, decimal_places=15, required=False)
     
     def create(self, validated_data):
         """Process face scan and record attendance."""
@@ -122,8 +122,8 @@ class ManualAttendanceSerializer(serializers.Serializer):
     trip_id = serializers.UUIDField()
     student_id = serializers.UUIDField()
     event_type = serializers.ChoiceField(choices=EventType.choices)
-    latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False)
-    longitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False)
+    latitude = serializers.DecimalField(max_digits=20, decimal_places=15, required=False)
+    longitude = serializers.DecimalField(max_digits=20, decimal_places=15, required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     
     def create(self, validated_data):

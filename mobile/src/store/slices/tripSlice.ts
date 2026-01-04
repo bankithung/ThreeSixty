@@ -87,6 +87,10 @@ const tripSlice = createSlice({
                 }
             }
         },
+
+        clearTripState: (state) => {
+            return initialState;
+        },
     },
     extraReducers: (builder) => {
         // Auto-select first child when children are loaded
@@ -161,6 +165,7 @@ export const {
     clearLiveLocation,
     updateStudentStatus,
     incrementTripCounter,
+    clearTripState,
 } = tripSlice.actions;
 
 export default tripSlice.reducer;

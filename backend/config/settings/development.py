@@ -6,7 +6,7 @@ from .base import *
 DEBUG = True
 
 # Allow Android emulator to connect
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '10.0.2.2']
+ALLOWED_HOSTS = ['*']
 
 # Use SQLite for development if PostgreSQL is not available
 DATABASES = {

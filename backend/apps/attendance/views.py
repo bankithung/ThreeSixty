@@ -27,14 +27,16 @@ class FaceScanCheckinView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     
     def post(self, request):
-        data = request.data.copy()
+        data = request.data.dict()
         data['event_type'] = EventType.CHECKIN
         
         serializer = FaceScanSerializer(
             data=data,
             context={'request': request}
         )
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            print(f"Check-in Serializer errors: {serializer.errors}")
+            serializer.is_valid(raise_exception=True)
         attendance = serializer.save()
         
         return Response({
@@ -49,7 +51,7 @@ class FaceScanCheckoutView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     
     def post(self, request):
-        data = request.data.copy()
+        data = request.data.dict()
         data['event_type'] = EventType.CHECKOUT
         
         serializer = FaceScanSerializer(
@@ -133,10 +135,13 @@ class TripAttendanceView(APIView):
             results.append({
                 'student': {
                     'id': str(student.id),
-                    'name': student.full_name,
-                    'photo': student.photo.url if student.photo else None,
+                    'full_name': student.full_name,
+                    'first_name': student.first_name,
+                    'last_name': student.last_name,
+                    'photo': request.build_absolute_uri(student.photo.url) if student.photo else None,
                     'grade': student.grade,
                     'section': student.section,
+                    'route_name': student.route.name if student.route else None,
                 },
                 'checkin': AttendanceSerializer(checkin).data if checkin else None,
                 'checkout': AttendanceSerializer(checkout).data if checkout else None,
@@ -145,9 +150,17 @@ class TripAttendanceView(APIView):
         
         return Response({
             'trip_id': str(trip.id),
+            'trip': {
+                'id': str(trip.id),
+                'bus_number': trip.bus.number if trip.bus else None,
+                'route_name': trip.route.name if trip.route else None,
+                'trip_type': trip.trip_type,
+                'status': trip.status,
+                'started_at': trip.started_at,
+            },
             'total_students': len(results),
-            'boarded': sum(1 for r in results if r['status'] in ['on_bus', 'dropped']),
-            'dropped': sum(1 for r in results if r['status'] == 'dropped'),
+            'checked_in_count': sum(1 for r in results if r['status'] in ['on_bus', 'dropped']),
+            'checked_out_count': sum(1 for r in results if r['status'] == 'dropped'),
             'students': results,
         })
 

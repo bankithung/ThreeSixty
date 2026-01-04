@@ -14,8 +14,8 @@ import Animated, {
 import { colors } from '../../constants/colors';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const BUTTON_HEIGHT = 56;
-const PADDING = 4;
+const BUTTON_HEIGHT = 60;
+const PADDING = 5;
 const SWIPEABLE_DIMENSIONS = BUTTON_HEIGHT - 2 * PADDING;
 
 interface SwipeButtonProps {
@@ -73,11 +73,25 @@ const SwipeButton: React.FC<SwipeButtonProps> = ({
         };
     });
 
+    // Text stays centered and always visible
     const textStyle = useAnimatedStyle(() => {
+        const maxTranslate = containerWidth - BUTTON_HEIGHT;
         return {
             opacity: interpolate(
                 translateX.value,
-                [0, containerWidth / 3],
+                [0, maxTranslate],
+                [1, 0.4],
+                Extrapolate.CLAMP
+            ),
+        };
+    });
+
+    const arrowStyle = useAnimatedStyle(() => {
+        const maxTranslate = containerWidth - BUTTON_HEIGHT;
+        return {
+            opacity: interpolate(
+                translateX.value,
+                [0, maxTranslate * 0.3],
                 [1, 0],
                 Extrapolate.CLAMP
             ),
@@ -88,17 +102,33 @@ const SwipeButton: React.FC<SwipeButtonProps> = ({
         return {
             width: translateX.value + BUTTON_HEIGHT,
         };
-    })
+    });
 
     return (
-        <View style={[styles.container, { backgroundColor }]} onLayout={onLayout}>
+        <View style={[styles.container, { backgroundColor, borderColor: color + '40' }]} onLayout={onLayout}>
             <Animated.View style={[styles.backgroundFill, { backgroundColor: color }, bgStyle]} />
+
+            {/* Chevrons hint */}
+            <View style={styles.chevronsContainer}>
+                <Animated.View style={arrowStyle}>
+                    <Icon name="chevron-right" size={16} color={color + '50'} />
+                </Animated.View>
+                <Animated.View style={arrowStyle}>
+                    <Icon name="chevron-right" size={16} color={color + '35'} />
+                </Animated.View>
+                <Animated.View style={arrowStyle}>
+                    <Icon name="chevron-right" size={16} color={color + '20'} />
+                </Animated.View>
+            </View>
+
+            {/* Centered text */}
             <Animated.Text style={[styles.title, { color: color }, textStyle]}>
                 {title}
             </Animated.Text>
+
             <PanGestureHandler onGestureEvent={gestureHandler} enabled={enabled}>
-                <Animated.View style={[styles.swipeable, animatedStyle]}>
-                    <Icon name={iconName} size={24} color={color} />
+                <Animated.View style={[styles.swipeable, { backgroundColor: color }, animatedStyle]}>
+                    <Icon name={iconName} size={24} color="#fff" />
                 </Animated.View>
             </PanGestureHandler>
         </View>
@@ -110,10 +140,12 @@ const styles = StyleSheet.create({
         height: BUTTON_HEIGHT,
         borderRadius: BUTTON_HEIGHT / 2,
         justifyContent: 'center',
+        alignItems: 'center',
         padding: PADDING,
         overflow: 'hidden',
         width: '100%',
         marginVertical: 8,
+        borderWidth: 2,
     },
     backgroundFill: {
         position: 'absolute',
@@ -121,27 +153,34 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         borderRadius: BUTTON_HEIGHT / 2,
+        opacity: 0.15,
+    },
+    chevronsContainer: {
+        position: 'absolute',
+        left: BUTTON_HEIGHT + 8,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     swipeable: {
+        position: 'absolute',
+        left: PADDING,
         height: SWIPEABLE_DIMENSIONS,
         width: SWIPEABLE_DIMENSIONS,
         borderRadius: SWIPEABLE_DIMENSIONS / 2,
-        backgroundColor: colors.white,
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 3,
+        elevation: 4,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
         zIndex: 2,
     },
     title: {
-        position: 'absolute',
-        alignSelf: 'center',
-        fontSize: 16,
-        fontWeight: '600',
-        zIndex: 1,
+        fontSize: 15,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+        textAlign: 'center',
     },
 });
 

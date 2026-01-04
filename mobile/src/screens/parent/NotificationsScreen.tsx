@@ -1,5 +1,5 @@
 /**
- * Notifications Screen - Using RTK Query
+ * Notifications Screen - Professional Design with Rounded Body
  */
 
 import React, { useCallback } from 'react';
@@ -11,6 +11,7 @@ import {
     SafeAreaView,
     TouchableOpacity,
     RefreshControl,
+    StatusBar,
 } from 'react-native';
 import { ParentTabScreenProps } from '../../types/navigation';
 import {
@@ -19,17 +20,25 @@ import {
     useMarkAllReadMutation,
     useMarkNotificationReadMutation,
 } from '../../store/api';
-import { colors } from '../../constants/colors';
-import { theme } from '../../constants/theme';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LoadingSpinner } from '../../components/common';
 import { NotificationCard } from '../../components/cards';
 import { Notification } from '../../types/models';
 
+const COLORS = {
+    dark: '#1a1a2e',
+    darkGray: '#2d2d44',
+    mediumGray: '#4a4a68',
+    lightGray: '#9ca3af',
+    surface: '#f8f9fa',
+    white: '#ffffff',
+    accent: '#4f46e5',
+    border: '#e5e7eb',
+};
+
 const NotificationsScreen: React.FC<ParentTabScreenProps<'Notifications'>> = ({
     navigation,
 }) => {
-    // RTK Query hooks
     const {
         data: notifications = [],
         isLoading,
@@ -44,12 +53,9 @@ const NotificationsScreen: React.FC<ParentTabScreenProps<'Notifications'>> = ({
     const [markRead] = useMarkNotificationReadMutation();
 
     const handleNotificationPress = useCallback(async (notification: Notification) => {
-        // Mark as read if not already
         if (!notification.is_read) {
             markRead(notification.id);
         }
-
-        // Navigate based on notification type
         if (notification.student && notification.trip) {
             navigation.navigate('Track', { studentId: notification.student });
         }
@@ -68,60 +74,58 @@ const NotificationsScreen: React.FC<ParentTabScreenProps<'Notifications'>> = ({
         />
     ), [handleNotificationPress]);
 
-    const renderHeader = () => (
-        <View style={styles.header}>
-            <View>
-                <Text style={styles.title}>Notifications</Text>
-                {unreadCount > 0 && (
-                    <Text style={styles.unreadCount}>{unreadCount} unread</Text>
-                )}
-            </View>
-            {unreadCount > 0 && (
-                <TouchableOpacity
-                    onPress={handleMarkAllRead}
-                    disabled={isMarkingAll}
-                >
-                    <Text style={[styles.markRead, isMarkingAll && styles.markReadDisabled]}>
-                        {isMarkingAll ? 'Marking...' : 'Mark all read'}
-                    </Text>
-                </TouchableOpacity>
-            )}
-        </View>
-    );
-
     const renderEmpty = () => (
         <View style={styles.empty}>
-            <Icon name="notifications-none" size={64} color={colors.textSecondary} style={{ marginBottom: theme.spacing.md }} />
-            <Text style={styles.emptyText}>No notifications yet</Text>
-            <Text style={styles.emptySubtext}>
-                You'll receive updates about your children's bus here
-            </Text>
+            <Icon name="notifications-none" size={48} color={COLORS.lightGray} />
+            <Text style={styles.emptyText}>No notifications</Text>
+            <Text style={styles.emptySubtext}>Updates about your children's bus will appear here</Text>
         </View>
     );
 
     if (isLoading && notifications.length === 0) {
-        return <LoadingSpinner fullScreen text="Loading notifications..." />;
+        return <LoadingSpinner fullScreen text="Loading..." />;
     }
 
     return (
         <SafeAreaView style={styles.container}>
-            {renderHeader()}
-            <FlatList
-                data={notifications}
-                renderItem={renderItem}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.listContent}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={isFetching}
-                        onRefresh={refetch}
-                        colors={[colors.primary]}
-                        tintColor={colors.primary}
-                    />
-                }
-                ListEmptyComponent={renderEmpty}
-                showsVerticalScrollIndicator={false}
-            />
+            <StatusBar barStyle="light-content" backgroundColor={COLORS.dark} />
+
+            {/* Header */}
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.title}>Notifications</Text>
+                    {unreadCount > 0 && (
+                        <Text style={styles.unreadCount}>{unreadCount} unread</Text>
+                    )}
+                </View>
+                {unreadCount > 0 && (
+                    <TouchableOpacity onPress={handleMarkAllRead} disabled={isMarkingAll}>
+                        <Text style={[styles.markRead, isMarkingAll && styles.markReadDisabled]}>
+                            {isMarkingAll ? 'Marking...' : 'Mark all read'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* List with rounded top */}
+            <View style={styles.listWrapper}>
+                <FlatList
+                    data={notifications}
+                    renderItem={renderItem}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.listContent}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isFetching}
+                            onRefresh={refetch}
+                            colors={[COLORS.accent]}
+                            tintColor={COLORS.accent}
+                        />
+                    }
+                    ListEmptyComponent={renderEmpty}
+                    showsVerticalScrollIndicator={false}
+                />
+            </View>
         </SafeAreaView>
     );
 };
@@ -129,58 +133,63 @@ const NotificationsScreen: React.FC<ParentTabScreenProps<'Notifications'>> = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: COLORS.dark,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: theme.spacing.md,
-        backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.divider,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: COLORS.dark,
     },
     title: {
-        fontSize: theme.typography.fontSize.xl,
+        fontSize: 20,
         fontWeight: '600',
-        color: colors.textPrimary,
+        color: COLORS.white,
     },
     unreadCount: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.textSecondary,
+        fontSize: 12,
+        color: COLORS.lightGray,
         marginTop: 2,
     },
     markRead: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.primary,
-        fontWeight: '500',
+        fontSize: 13,
+        color: COLORS.accent,
+        fontWeight: '600',
     },
     markReadDisabled: {
-        color: colors.textHint,
+        color: COLORS.mediumGray,
+    },
+    listWrapper: {
+        flex: 1,
+        backgroundColor: COLORS.surface,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        overflow: 'hidden',
     },
     listContent: {
         flexGrow: 1,
+        padding: 16,
+        paddingTop: 20,
     },
     empty: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: theme.spacing.xxl,
-    },
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: theme.spacing.md,
+        paddingVertical: 60,
     },
     emptyText: {
-        fontSize: theme.typography.fontSize.lg,
+        fontSize: 16,
         fontWeight: '500',
-        color: colors.textSecondary,
-        marginBottom: theme.spacing.xs,
+        color: COLORS.mediumGray,
+        marginTop: 12,
     },
     emptySubtext: {
-        fontSize: theme.typography.fontSize.sm,
-        color: colors.textHint,
+        fontSize: 13,
+        color: COLORS.lightGray,
         textAlign: 'center',
+        marginTop: 4,
     },
 });
 

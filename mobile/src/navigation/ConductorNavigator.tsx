@@ -11,6 +11,7 @@ import {
     StudentListScreen,
     FaceScanScreen,
     TripSummaryScreen,
+    ReportsScreen,
 } from '../screens/conductor';
 import { ProfileScreen, SOSScreen, EditProfileScreen } from '../screens/common';
 
@@ -47,11 +48,11 @@ const ConductorNavigator: React.FC = () => {
                     animation: 'slide_from_bottom',
                 }}
             />
+            <Stack.Screen name="Reports" component={ReportsScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen
                 name="EditProfile"
                 component={EditProfileScreen}
-                options={{ headerShown: true, title: 'Edit Profile' }}
             />
         </Stack.Navigator>
     );
