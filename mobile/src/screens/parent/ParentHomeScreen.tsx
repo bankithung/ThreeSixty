@@ -21,7 +21,7 @@ import { useAuth } from '../../hooks';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Avatar, LoadingSpinner } from '../../components/common';
 import { Student } from '../../types/models';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 // Professional muted color palette - matching Conductor
 const COLORS = {
@@ -38,6 +38,36 @@ const COLORS = {
     border: '#e5e7eb',
 };
 
+// Recursive component to calculate total 'On Bus' status
+const LiveRouteCount: React.FC<{ childrenList: Student[], index?: number, count?: number }> = ({ childrenList, index = 0, count = 0 }) => {
+    // Base case: if we've checked all children, render the final count
+    if (index >= childrenList.length) {
+        return <>{count}</>;
+    }
+
+    const child = childrenList[index];
+    // Hook call is stable because index increments predictably
+    const { data: status } = useGetChildStatusQuery(child.id);
+    const isOnBus = status?.status === 'on_bus';
+
+    return (
+        <LiveRouteCount
+            childrenList={childrenList}
+            index={index + 1}
+            count={count + (isOnBus ? 1 : 0)}
+        />
+    );
+};
+
+// Wrapper for the stat value
+const RouteStat: React.FC<{ childrenList: Student[] }> = ({ childrenList }) => {
+    return (
+        <Text style={[styles.statValue, { color: COLORS.success }]}>
+            {childrenList.length > 0 ? <LiveRouteCount childrenList={childrenList} /> : 0}
+        </Text>
+    );
+};
+
 // Compact Child Card for horizontal scroll
 const CompactChildCard: React.FC<{
     child: Student;
@@ -48,9 +78,28 @@ const CompactChildCard: React.FC<{
 
     const getStatusInfo = () => {
         if (!status) return { text: '...', color: COLORS.mediumGray, bg: '#f3f4f6' };
+
+        // Check if student has already completed (dropped) the CURRENT active trip
+        const isDroppedFromActiveTrip = status.active_trip_id && status.today_records?.some(
+            (r: any) => r.trip === status.active_trip_id && r.event_type === 'checkout'
+        );
+
+        // If there is an active trip, and we are NOT on it AND NOT dropped from it yet -> Bus Arriving
+        if (status.active_trip_id && status.status !== 'on_bus' && !isDroppedFromActiveTrip) {
+            return { text: 'Bus En Route', color: '#ffffff', bg: COLORS.accent };
+        }
+
         switch (status.status) {
             case 'on_bus': return { text: 'On Bus', color: '#ffffff', bg: COLORS.success };
-            case 'dropped': return { text: 'Home', color: '#ffffff', bg: COLORS.dark };
+            case 'dropped':
+                // Check latest record to decide text
+                const lastRecord = status.today_records?.[status.today_records.length - 1];
+                const isSchoolDrop = lastRecord?.trip_type === 'morning';
+                return {
+                    text: isSchoolDrop ? 'At School' : 'At Home',
+                    color: '#ffffff',
+                    bg: COLORS.dark
+                };
             default: return { text: 'Waiting', color: '#ffffff', bg: COLORS.warning };
         }
     };
@@ -75,7 +124,7 @@ const CompactChildCard: React.FC<{
             <Text style={styles.compactName} numberOfLines={1}>{firstName}</Text>
             <Text style={styles.compactGrade}>Grade {child.grade}</Text>
 
-            {status?.active_trip_id && (
+            {status?.active_trip_id && status?.status !== 'dropped' && (
                 <TouchableOpacity style={styles.compactTrackBtn} onPress={(e) => { e.stopPropagation(); onTrack(); }}>
                     <Icon name="location-on" size={14} color={COLORS.white} />
                 </TouchableOpacity>
@@ -144,9 +193,7 @@ const ParentHomeScreen: React.FC<any> = ({ navigation }) => {
                             <Text style={styles.statLabel}>Children</Text>
                         </View>
                         <View style={styles.statCard}>
-                            <Text style={[styles.statValue, { color: COLORS.success }]}>
-                                {children.filter((c: Student) => c.route_name).length}
-                            </Text>
+                            <RouteStat childrenList={children} />
                             <Text style={styles.statLabel}>On Route</Text>
                         </View>
                         <View style={styles.statCard}>

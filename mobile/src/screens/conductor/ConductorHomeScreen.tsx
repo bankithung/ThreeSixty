@@ -62,6 +62,9 @@ const ConductorHomeScreen: React.FC<ConductorScreenProps<'ConductorHome'>> = ({
     const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
     const [tripType, setTripType] = useState<'morning' | 'evening'>('morning');
     const [endedTripId, setEndedTripId] = useState<string | null>(null);
+    const [gpsStatus, setGpsStatus] = useState<string>('Waiting for GPS...');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [lastLoc, setLastLoc] = useState<{ lat: number, lng: number } | null>(null);
 
     // RTK Query hooks
     const { data: activeTrips = [] } = useGetActiveTripsQuery(undefined, {
@@ -80,17 +83,28 @@ const ConductorHomeScreen: React.FC<ConductorScreenProps<'ConductorHome'>> = ({
     const [endTripMutation] = useEndTripMutation();
     const [updateLocation] = useUpdateLocationMutation();
 
-    const { startTracking, stopTracking } = useLocation({
+    const { startTracking, stopTracking, requestPermission } = useLocation({
         interval: 5000,
         onUpdate: (loc) => {
+            setLastLoc({ lat: loc.latitude, lng: loc.longitude });
+            setGpsStatus(`GPS: OK (${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)})`);
+
             if (currentTrip?.id) {
                 updateLocation({
                     tripId: currentTrip.id,
-                    latitude: loc.latitude,
-                    longitude: loc.longitude,
-                    speed: loc.speed || undefined,
-                    heading: loc.heading || undefined,
+                    latitude: parseFloat(loc.latitude.toFixed(6)),
+                    longitude: parseFloat(loc.longitude.toFixed(6)),
+                    speed: loc.speed || 0.0,
+                    heading: loc.heading || 0.0,
+                }).then((res: any) => {
+                    if (res.error) {
+                        setGpsStatus(`API Error: ${res.error.status}`);
+                    }
+                }).catch(err => {
+                    setGpsStatus(`Net Error: ${err.message}`);
                 });
+            } else {
+                setGpsStatus(`GPS OK (No Active Trip)`);
             }
         },
     });
@@ -128,6 +142,17 @@ const ConductorHomeScreen: React.FC<ConductorScreenProps<'ConductorHome'>> = ({
             return;
         }
 
+        // Enforce Location Permission
+        const hasPermission = await requestPermission();
+        if (!hasPermission) {
+            Alert.alert(
+                'Permission Required',
+                'Location access is required to start a trip. Parents rely on live tracking to see the bus location.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
         try {
             const trip = await startTripMutation({
                 busId: selectedBusId,
@@ -138,7 +163,7 @@ const ConductorHomeScreen: React.FC<ConductorScreenProps<'ConductorHome'>> = ({
         } catch (error: any) {
             Alert.alert('Error', error?.data?.detail || 'Failed to start trip');
         }
-    }, [selectedBusId, selectedRouteId, tripType, startTripMutation, dispatch]);
+    }, [selectedBusId, selectedRouteId, tripType, startTripMutation, dispatch, requestPermission]);
 
     const handleEndTrip = useCallback(async () => {
         if (currentTrip) {
@@ -402,6 +427,7 @@ const ConductorHomeScreen: React.FC<ConductorScreenProps<'ConductorHome'>> = ({
                     <Text style={styles.subtitle}>
                         {isActiveTrip ? 'Manage your active trip' : 'Ready to start?'}
                     </Text>
+                    <Text style={{ color: '#FFD700', fontSize: 11, marginTop: 4, fontWeight: 'bold' }}>{gpsStatus}</Text>
                 </View>
                 <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatarBtn}>
                     <Avatar source={user?.avatar} name={user?.full_name || ''} size="small" />

@@ -34,6 +34,12 @@ export const useLocation = ({
     const [isTracking, setIsTracking] = useState(false);
     const watchIdRef = useRef<number | null>(null);
 
+    const onUpdateRef = useRef(onUpdate);
+
+    useEffect(() => {
+        onUpdateRef.current = onUpdate;
+    }, [onUpdate]);
+
     const requestPermission = async (): Promise<boolean> => {
         if (Platform.OS === 'android') {
             try {
@@ -100,6 +106,33 @@ export const useLocation = ({
 
         setIsTracking(true);
 
+        // Force an initial fix immediately
+        Geolocation.getCurrentPosition(
+            (position) => {
+                const loc: LocationState = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    speed: position.coords.speed,
+                    heading: position.coords.heading,
+                    accuracy: position.coords.accuracy,
+                    timestamp: position.timestamp,
+                };
+                setLocation(loc);
+                setError(null);
+                if (onUpdateRef.current) {
+                    onUpdateRef.current(loc);
+                }
+            },
+            (err) => {
+                console.log('Initial location fix failed:', err);
+            },
+            {
+                enableHighAccuracy,
+                timeout: 15000,
+                maximumAge: 10000,
+            }
+        );
+
         watchIdRef.current = Geolocation.watchPosition(
             (position) => {
                 const loc: LocationState = {
@@ -112,7 +145,9 @@ export const useLocation = ({
                 };
                 setLocation(loc);
                 setError(null);
-                onUpdate?.(loc);
+                if (onUpdateRef.current) {
+                    onUpdateRef.current(loc);
+                }
             },
             (err) => {
                 setError(err.message);
@@ -124,7 +159,7 @@ export const useLocation = ({
                 fastestInterval: interval / 2,
             }
         );
-    }, [enableHighAccuracy, interval, onUpdate]);
+    }, [enableHighAccuracy, interval]);
 
     const stopTracking = useCallback(() => {
         if (watchIdRef.current !== null) {
@@ -151,6 +186,7 @@ export const useLocation = ({
         getCurrentLocation,
         startTracking,
         stopTracking,
+        requestPermission,
     };
 };
 

@@ -80,4 +80,7 @@ class SchoolListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = School
-        fields = ['id', 'name', 'code', 'city', 'logo', 'is_active']
+        fields = [
+            'id', 'name', 'code', 'city', 'state', 'pincode', 'address',
+            'phone', 'email', 'latitude', 'longitude', 'logo', 'is_active'
+        ]

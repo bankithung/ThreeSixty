@@ -121,6 +121,57 @@ export const busesAPI = {
     create: (data: any) => api.post('/transport/buses/', data),
     update: (id: string, data: any) => api.patch(`/transport/buses/${id}/`, data),
     delete: (id: string) => api.delete(`/transport/buses/${id}/`),
+
+    // Bus Profile
+    getProfile: (id: string) => api.get(`/transport/buses/${id}/profile/`),
+    updateProfile: (id: string, data: any) => api.patch(`/transport/buses/${id}/profile/`, data),
+
+    // Fuel Entries
+    listFuel: (busId: string) => api.get(`/transport/buses/${busId}/fuel/`),
+    addFuel: (busId: string, data: any) => api.post(`/transport/buses/${busId}/fuel/`, data),
+    updateFuel: (busId: string, fuelId: string, data: any) =>
+        api.patch(`/transport/buses/${busId}/fuel/${fuelId}/`, data),
+    deleteFuel: (busId: string, fuelId: string) =>
+        api.delete(`/transport/buses/${busId}/fuel/${fuelId}/`),
+
+    // Expenses
+    listExpenses: (busId: string, params?: any) =>
+        api.get(`/transport/buses/${busId}/expenses/`, { params }),
+    addExpense: (busId: string, data: any) =>
+        api.post(`/transport/buses/${busId}/expenses/`, data),
+    updateExpense: (busId: string, expenseId: string, data: any) =>
+        api.patch(`/transport/buses/${busId}/expenses/${expenseId}/`, data),
+    deleteExpense: (busId: string, expenseId: string) =>
+        api.delete(`/transport/buses/${busId}/expenses/${expenseId}/`),
+
+    // Earnings
+    listEarnings: (busId: string) => api.get(`/transport/buses/${busId}/earnings/`),
+    addEarning: (busId: string, data: any) =>
+        api.post(`/transport/buses/${busId}/earnings/`, data),
+    updateEarning: (busId: string, earningId: string, data: any) =>
+        api.patch(`/transport/buses/${busId}/earnings/${earningId}/`, data),
+    deleteEarning: (busId: string, earningId: string) =>
+        api.delete(`/transport/buses/${busId}/earnings/${earningId}/`),
+
+    // Students
+    listStudents: (busId: string) => api.get(`/transport/buses/${busId}/students/`),
+
+    // Live Status
+    getLiveStatus: (busId: string) => api.get(`/transport/buses/${busId}/live/`),
+
+    // Analytics
+    getAnalytics: (busId: string, params?: any) =>
+        api.get(`/transport/buses/${busId}/analytics/`, { params }),
+
+    // Image management
+    uploadImage: (id: string, formData: FormData) => api.post(`/transport/buses/${id}/upload-image/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    deleteImage: (id: string, imageIndex: number) => api.delete(`/transport/buses/${id}/images/${imageIndex}/`),
+
+    // Student assignment
+    assignStudentToStop: (studentId: string, stopId: string) =>
+        api.patch(`/students/${studentId}/`, { stop: stopId }),
 }
 
 // ========== ROUTES ==========
@@ -133,6 +184,8 @@ export const routesAPI = {
     getStops: (id: string) => api.get(`/transport/routes/${id}/stops/`),
     addStop: (routeId: string, data: any) =>
         api.post(`/transport/routes/${routeId}/stops/`, data),
+    replaceStops: (routeId: string, stops: any[]) =>
+        api.post(`/transport/routes/${routeId}/stops/update/`, { stops }),
 }
 
 // ========== TRIPS ==========

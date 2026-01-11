@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { tripsAPI } from '../lib/api'
 import { FiActivity, FiMapPin, FiClock, FiUsers } from 'react-icons/fi'
+import LiveMap from '../components/LiveMap'
 
 export default function Trips() {
     const { data: activeTrips, isLoading: loadingActive } = useQuery({
@@ -26,6 +27,9 @@ export default function Trips() {
 
     return (
         <div className="space-y-6 animate-fade-in">
+            {/* Live Map */}
+            {active.length > 0 && <LiveMap trips={active} />}
+
             {/* Active Trips */}
             <div>
                 <div className="flex items-center mb-4">

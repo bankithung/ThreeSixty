@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { busesAPI, staffAPI, accountsAPI, schoolsAPI } from '../lib/api'
 import toast from 'react-hot-toast'
@@ -7,6 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 
 export default function Buses() {
     const { user } = useAuth()
+    const navigate = useNavigate()
     const queryClient = useQueryClient()
     const [search, setSearch] = useState('')
     const [showModal, setShowModal] = useState(false)
@@ -94,10 +96,7 @@ export default function Buses() {
 
                             <div className="mt-4 pt-4 border-t flex justify-end space-x-2">
                                 <button
-                                    onClick={() => {
-                                        setEditingBus(bus)
-                                        setShowModal(true)
-                                    }}
+                                    onClick={() => navigate(`/buses/${bus.id}`)}
                                     className="p-2 text-gray-500 hover:text-blue-500"
                                 >
                                     <FiEdit />

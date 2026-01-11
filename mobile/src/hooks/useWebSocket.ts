@@ -2,12 +2,12 @@
  * Custom hook for WebSocket connection management
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAppDispatch } from '../store/hooks';
-import { updateLiveLocation, setWsConnected } from '../store/slices/tripSlice';
-import { addRealtimeNotification } from '../store/slices/notificationSlice';
+import { updateLiveLocation, setWsConnected, clearLiveLocation } from '../store/slices/tripSlice';
 import { WS_BASE_URL } from '../constants/config';
-import { LocationData, Notification } from '../types/models';
+import { LocationData } from '../types/models';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface UseWebSocketOptions {
     tripId: string | null;
@@ -27,14 +27,38 @@ export const useWebSocket = ({
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const reconnectAttempts = useRef(0);
     const maxReconnectAttempts = 5;
+    const [token, setToken] = useState<string | null>(null);
+
+    // Fetch token on mount
+    useEffect(() => {
+        const fetchToken = async () => {
+            const storedToken = await AsyncStorage.getItem('@auth_access_token');
+            setToken(storedToken);
+        };
+        fetchToken();
+    }, []);
+
+    // Use refs for callbacks to avoid re-connecting when they change
+    const onLocationUpdateRef = useRef(onLocationUpdate);
+    const onAttendanceEventRef = useRef(onAttendanceEvent);
+    const onTripStatusRef = useRef(onTripStatus);
+
+    useEffect(() => {
+        onLocationUpdateRef.current = onLocationUpdate;
+        onAttendanceEventRef.current = onAttendanceEvent;
+        onTripStatusRef.current = onTripStatus;
+    }, [onLocationUpdate, onAttendanceEvent, onTripStatus]);
 
     const connect = useCallback(() => {
-        if (!tripId) return;
+        if (!tripId || !token) return;
 
-        const ws = new WebSocket(`${WS_BASE_URL}/trip/${tripId}/`);
+        // Force HTTPS/WSS if needed, though usually handled by config
+        // Append token to query params for TokenAuthMiddleware
+        const wsUrl = `${WS_BASE_URL}/trip/${tripId}/?token=${token}`;
+        const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-            console.log('WebSocket connected');
+            console.log('Trip WebSocket connected');
             dispatch(setWsConnected(true));
             reconnectAttempts.current = 0;
         };
@@ -51,17 +75,42 @@ export const useWebSocket = ({
                             speed: data.data.speed,
                             heading: data.data.heading,
                             timestamp: data.data.timestamp,
+                            next_stop: data.data.next_stop, // Map next_stop
                         };
                         dispatch(updateLiveLocation(location));
-                        onLocationUpdate?.(location);
+                        if (onLocationUpdateRef.current) {
+                            onLocationUpdateRef.current(location);
+                        }
+                        break;
+
+                    case 'trip_info':
+                        // Handle initial trip data
+                        if (data.data.latest_location) {
+                            const initialLocation: LocationData = {
+                                latitude: data.data.latest_location.latitude,
+                                longitude: data.data.latest_location.longitude,
+                                speed: data.data.latest_location.speed,
+                                heading: data.data.latest_location.heading,
+                                timestamp: data.data.latest_location.timestamp || data.data.latest_location.created_at,
+                                next_stop: data.data.latest_location.next_stop,
+                            };
+                            dispatch(updateLiveLocation(initialLocation));
+                            if (onLocationUpdateRef.current) {
+                                onLocationUpdateRef.current(initialLocation);
+                            }
+                        }
                         break;
 
                     case 'attendance_event':
-                        onAttendanceEvent?.(data.data);
+                        if (onAttendanceEventRef.current) {
+                            onAttendanceEventRef.current(data.data);
+                        }
                         break;
 
                     case 'trip_status':
-                        onTripStatus?.(data.data);
+                        if (onTripStatusRef.current) {
+                            onTripStatusRef.current(data.data);
+                        }
                         break;
 
                     case 'pong':
@@ -73,15 +122,15 @@ export const useWebSocket = ({
             }
         };
 
-        ws.onclose = () => {
-            console.log('WebSocket disconnected');
+        ws.onclose = (e) => {
+            console.log('Trip WebSocket disconnected', e.code, e.reason);
             dispatch(setWsConnected(false));
 
             // Attempt reconnection
             if (reconnectAttempts.current < maxReconnectAttempts) {
                 reconnectAttempts.current += 1;
                 const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-                console.log(`Reconnecting in ${delay}ms...`);
+                console.log(`Reconnecting to trip in ${delay}ms...`);
 
                 reconnectTimeoutRef.current = setTimeout(() => {
                     connect();
@@ -94,7 +143,7 @@ export const useWebSocket = ({
         };
 
         wsRef.current = ws;
-    }, [tripId, dispatch, onLocationUpdate, onAttendanceEvent, onTripStatus]);
+    }, [tripId, token, dispatch]);
 
     const disconnect = useCallback(() => {
         if (reconnectTimeoutRef.current) {
@@ -105,6 +154,7 @@ export const useWebSocket = ({
             wsRef.current = null;
         }
         dispatch(setWsConnected(false));
+        dispatch(clearLiveLocation());
     }, [dispatch]);
 
     const sendMessage = useCallback((message: object) => {
@@ -113,17 +163,18 @@ export const useWebSocket = ({
         }
     }, []);
 
-    // Connect when tripId changes
+    // Connect when tripId OR token changes
     useEffect(() => {
-        if (tripId) {
+        if (tripId && token) {
             connect();
         }
+        // Cleanup function runs when tripId changes or component unmounts
         return () => {
             disconnect();
         };
-    }, [tripId, connect, disconnect]);
+    }, [tripId, token, connect, disconnect]);
 
-    // Ping to keep connection alive
+    // Ping
     useEffect(() => {
         const pingInterval = setInterval(() => {
             sendMessage({ type: 'ping' });
@@ -141,3 +192,4 @@ export const useWebSocket = ({
 };
 
 export default useWebSocket;
+

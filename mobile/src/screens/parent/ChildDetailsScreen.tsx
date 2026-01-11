@@ -89,12 +89,31 @@ const ChildDetailsScreen: React.FC<ParentScreenProps<'ChildDetails'>> = ({
 
     const getStatusInfo = () => {
         if (!status) return { icon: 'help-outline', text: 'Unknown', color: COLORS.mediumGray };
+
+        // Check if student has already completed (dropped) the CURRENT active trip
+        const isDroppedFromActiveTrip = status.active_trip_id && status.today_records?.some(
+            (r: any) => r.trip === status.active_trip_id && r.event_type === 'checkout'
+        );
+
+        // Prioritize active trip ONLY if waiting (not boarded and not dropped from current trip)
+        if (status.active_trip_id && status.status !== 'on_bus' && !isDroppedFromActiveTrip) {
+            return { icon: 'directions-bus', text: 'Bus on the way', color: COLORS.accent };
+        }
+
         switch (status.status) {
             case 'on_bus': return { icon: 'directions-bus', text: 'On Bus', color: COLORS.success };
-            case 'dropped': return { icon: 'home', text: 'Home', color: COLORS.dark };
+            case 'dropped':
+                // Check latest record
+                const lastRecord = status.today_records?.[status.today_records.length - 1];
+                const isSchool = lastRecord?.trip_type === 'morning';
+                return {
+                    icon: isSchool ? 'school' : 'home',
+                    text: isSchool ? 'At School' : 'At Home', // Context aware
+                    color: COLORS.dark
+                };
             default: return { icon: 'schedule', text: 'Waiting', color: COLORS.warning };
         }
-    };
+    }
 
     const formatTime = (timestamp: string) => {
         return new Date(timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -103,6 +122,17 @@ const ChildDetailsScreen: React.FC<ParentScreenProps<'ChildDetails'>> = ({
     const formatDate = (timestamp: string) => {
         return new Date(timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     };
+
+
+    // ... (rest of file)
+
+    // Check if dropped from active trip for button visibility
+    const isDroppedFromActiveTrip = status?.active_trip_id && status?.today_records?.some(
+        (r: any) => r.trip === status.active_trip_id && r.event_type === 'checkout'
+    );
+
+    // Show button if active trip exists AND (we are on bus OR (not on bus AND not dropped from THIS trip))
+    const showTrackButton = status?.active_trip_id && (status?.status === 'on_bus' || !isDroppedFromActiveTrip);
 
     if (isLoadingChild && !child) {
         return <LoadingSpinner fullScreen />;
@@ -146,15 +176,19 @@ const ChildDetailsScreen: React.FC<ParentScreenProps<'ChildDetails'>> = ({
                         </View>
                     </View>
 
-                    {/* Track Bus Button - Visible when on bus */}
-                    {status?.status === 'on_bus' && (
+                    {/* Track Bus Button - Visible when trip is active AND not dropped from it */}
+                    {showTrackButton && (
                         <TouchableOpacity style={styles.trackBusBtn} onPress={handleTrack}>
                             <View style={styles.trackBusIcon}>
                                 <Icon name="location-on" size={20} color={COLORS.white} />
                             </View>
                             <View style={styles.trackBusInfo}>
                                 <Text style={styles.trackBusTitle}>Track Bus Live</Text>
-                                <Text style={styles.trackBusSubtitle}>{childName} is currently on the bus</Text>
+                                <Text style={styles.trackBusSubtitle}>
+                                    {status?.status === 'on_bus'
+                                        ? `${childName} is currently on the bus`
+                                        : 'Bus is currently on the way'}
+                                </Text>
                             </View>
                             <Icon name="chevron-right" size={22} color={COLORS.white} />
                         </TouchableOpacity>

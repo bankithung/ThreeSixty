@@ -39,6 +39,24 @@ class FaceScanCheckinView(APIView):
             serializer.is_valid(raise_exception=True)
         attendance = serializer.save()
         
+        # Broadcast update to parents
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        
+        channel_layer = get_channel_layer()
+        for parent in attendance.student.parents.all():
+            if parent.user:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{parent.user.id}",
+                    {
+                        'type': 'trip_event',
+                        'event_type': 'trip_started', # Reusing this to trigger full refresh
+                        'data': {
+                            'message': f"{attendance.student.first_name} has boarded the bus"
+                        }
+                    }
+                )
+
         return Response({
             'message': f'{attendance.student.full_name} checked in successfully',
             'attendance': AttendanceSerializer(attendance).data
@@ -60,6 +78,24 @@ class FaceScanCheckoutView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         attendance = serializer.save()
+
+        # Broadcast update to parents
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        
+        channel_layer = get_channel_layer()
+        for parent in attendance.student.parents.all():
+            if parent.user:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{parent.user.id}",
+                    {
+                        'type': 'trip_event',
+                        'event_type': 'trip_started', # Reusing this to trigger full refresh
+                        'data': {
+                            'message': f"{attendance.student.first_name} has been dropped off"
+                        }
+                    }
+                )
         
         return Response({
             'message': f'{attendance.student.full_name} checked out successfully',
@@ -78,6 +114,25 @@ class ManualAttendanceView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         attendance = serializer.save()
+
+        # Broadcast update to parents
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+        
+        channel_layer = get_channel_layer()
+        for parent in attendance.student.parents.all():
+            if parent.user:
+                action = "boarded" if attendance.event_type == 'checkin' else "dropped off"
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{parent.user.id}",
+                    {
+                        'type': 'trip_event',
+                        'event_type': 'trip_started', # Reusing this to trigger full refresh
+                        'data': {
+                            'message': f"{attendance.student.first_name} has been {action}"
+                        }
+                    }
+                )
         
         return Response({
             'message': f'{attendance.student.full_name} marked as {attendance.event_type}',
@@ -273,13 +328,17 @@ class ChildCurrentStatusView(APIView):
             current_status = 'dropped'
             message = f'Dropped at {latest.timestamp.strftime("%I:%M %p")}'
         
-        # Get active trip if student is on bus
+        # Check for active trip for student's route
         active_trip = None
-        if current_status == 'on_bus' and student.route:
+        if student.route:
             active_trip = Trip.objects.filter(
                 route=student.route,
                 status=TripStatus.IN_PROGRESS
             ).first()
+            
+        # Update status message if trip is active but student not boarded
+        if active_trip and current_status == 'not_on_bus':
+            message = 'Bus is on the way'
         
         return Response({
             'student': {

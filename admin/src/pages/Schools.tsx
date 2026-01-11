@@ -5,6 +5,47 @@ import { schoolsAPI } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { FiPlus, FiSearch, FiEdit, FiTrash2, FiEye } from 'react-icons/fi'
+import LocationPicker from '../components/LocationPicker'
+import SearchableSelect from '../components/SearchableSelect'
+
+const INDIAN_STATES = [
+    'Andaman and Nicobar Islands',
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chandigarh',
+    'Chhattisgarh',
+    'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jammu and Kashmir',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Ladakh',
+    'Lakshadweep',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Puducherry',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+]
 
 export default function Schools() {
     const { user } = useAuth()
@@ -27,6 +68,20 @@ export default function Schools() {
         },
         onError: (error: any) => {
             toast.error(error.response?.data?.detail || 'Failed to create school')
+        },
+    })
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }: { id: string; data: any }) => schoolsAPI.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['schools'] })
+            toast.success('School updated successfully')
+            setShowModal(false)
+        },
+        onError: (error: any) => {
+            console.error('Update failed:', error.response?.data)
+            const errorMsg = error.response?.data?.detail || JSON.stringify(error.response?.data) || 'Failed to update school'
+            toast.error(errorMsg)
         },
     })
 
@@ -194,13 +249,31 @@ export default function Schools() {
                     school={editingSchool}
                     onClose={() => setShowModal(false)}
                     onSave={(data) => {
-                        if (editingSchool) {
-                            // Update logic would go here
+                        const payload = { ...data }
+
+                        // Ensure lat/lng are numbers or null
+                        // Check specifically for empty string or undefined/null
+                        if (payload.latitude === '' || payload.latitude === undefined || payload.latitude === null) {
+                            payload.latitude = null
                         } else {
-                            createMutation.mutate(data)
+                            payload.latitude = Number(payload.latitude)
+                        }
+
+                        if (payload.longitude === '' || payload.longitude === undefined || payload.longitude === null) {
+                            payload.longitude = null
+                        } else {
+                            payload.longitude = Number(payload.longitude)
+                        }
+
+                        if (editingSchool) {
+                            // Remove admin fields for update
+                            const { admin_name, admin_email, admin_phone, admin_password, ...updateData } = payload
+                            updateMutation.mutate({ id: editingSchool.id, data: updateData })
+                        } else {
+                            createMutation.mutate(payload)
                         }
                     }}
-                    isLoading={createMutation.isPending}
+                    isLoading={createMutation.isPending || updateMutation.isPending}
                 />
             )}
         </div>
@@ -228,6 +301,8 @@ function SchoolModal({
         phone: school?.phone || '',
         email: school?.email || '',
         pincode: school?.pincode || '',
+        latitude: school?.latitude || undefined,
+        longitude: school?.longitude || undefined,
         admin_name: '',
         admin_email: '',
         admin_phone: '',
@@ -236,12 +311,26 @@ function SchoolModal({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
+
+        if (!formData.state) {
+            toast.error('State is required')
+            return
+        }
+        if (!formData.city) {
+            toast.error('City is required')
+            return
+        }
+        if (!formData.pincode) {
+            toast.error('Pincode is required')
+            return
+        }
+
         onSave(formData)
     }
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="p-6 border-b">
                     <h2 className="text-xl font-semibold">
                         {school ? 'Edit School' : 'Add New School'}
@@ -328,11 +417,11 @@ function SchoolModal({
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 State
                             </label>
-                            <input
-                                type="text"
+                            <SearchableSelect
                                 value={formData.state}
-                                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                                className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-primary-500 outline-none"
+                                onChange={(value) => setFormData({ ...formData, state: value })}
+                                options={INDIAN_STATES}
+                                placeholder="Select State"
                             />
                         </div>
 
@@ -347,6 +436,33 @@ function SchoolModal({
                                 className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-primary-500 outline-none"
                                 required
                             />
+                        </div>
+
+                        <div className="col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                School Location
+                            </label>
+                            <LocationPicker
+                                latitude={formData.latitude}
+                                longitude={formData.longitude}
+                                onLocationSelect={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
+                            />
+                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                <input
+                                    type="text"
+                                    placeholder="Latitude"
+                                    value={formData.latitude || ''}
+                                    readOnly
+                                    className="px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-500"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Longitude"
+                                    value={formData.longitude || ''}
+                                    readOnly
+                                    className="px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-500"
+                                />
+                            </div>
                         </div>
                     </div>
 

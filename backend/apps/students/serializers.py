@@ -202,13 +202,18 @@ class ParentChildrenSerializer(serializers.ModelSerializer):
     """Serializer for parent's children list."""
     school_name = serializers.CharField(source='school.name', read_only=True)
     route_name = serializers.CharField(source='route.name', read_only=True)
+    stop_name = serializers.CharField(source='stop.name', read_only=True)
+    school_latitude = serializers.DecimalField(source='school.latitude', max_digits=10, decimal_places=7, read_only=True)
+    school_longitude = serializers.DecimalField(source='school.longitude', max_digits=10, decimal_places=7, read_only=True)
     current_status = serializers.SerializerMethodField()
     
     class Meta:
         model = Student
         fields = [
-            'id', 'first_name', 'last_name', 'grade', 'section',
-            'photo', 'school_name', 'route_name', 'current_status'
+            'id', 'first_name', 'last_name', 'full_name', 'grade', 'section',
+            'photo', 'school_name', 'route_name', 'stop_name', 'current_status',
+            'pickup_latitude', 'pickup_longitude',
+            'school_latitude', 'school_longitude'
         ]
     
     def get_current_status(self, obj):

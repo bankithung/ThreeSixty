@@ -22,7 +22,12 @@ import {
 // Custom base query with auth header
 const baseQuery = fetchBaseQuery({
     baseUrl: API_BASE_URL,
-    prepareHeaders: async (headers) => {
+    prepareHeaders: async (headers, { endpoint }) => {
+        // Skip auth token for public endpoints to avoid 401s from invalid tokens
+        if (endpoint === 'sendOTP' || endpoint === 'verifyOTP') {
+            return headers;
+        }
+
         const token = await AsyncStorage.getItem('@auth_access_token');
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
@@ -171,6 +176,7 @@ export const api = createApi({
                 if (response?.results) return response.results;
                 return [];
             },
+            providesTags: ['Attendance'],
         }),
 
         getChildTrip: builder.query<{ trip: Trip | null; latest_location: any; student_stop: any }, string>({

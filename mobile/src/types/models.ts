@@ -78,6 +78,8 @@ export interface Student {
     face_encoding_count: number;
     parents: ParentMinimal[];
     is_active: boolean;
+    school_latitude?: number;
+    school_longitude?: number;
 }
 
 export interface ParentMinimal {
@@ -97,6 +99,7 @@ export interface ChildStatus {
     };
     status: 'not_on_bus' | 'on_bus' | 'dropped';
     active_trip_id: string | null;
+    trip_type?: 'morning' | 'evening' | 'special';
     message: string;
     today_records: Attendance[];
 }
@@ -169,6 +172,13 @@ export interface LocationData {
     heading?: number;
     accuracy?: number;
     timestamp?: string;
+    next_stop?: {
+        id: string;
+        name: string;
+        sequence: number;
+        distance_km: number;
+        eta_mins: number;
+    };
 }
 
 export interface TripTrackingData {
@@ -202,6 +212,7 @@ export interface Attendance {
     face_image: string | null;
     verified_by: string | null;
     notes: string | null;
+    trip_type?: TripType;
 }
 
 export interface TripAttendance {

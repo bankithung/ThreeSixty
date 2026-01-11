@@ -11,11 +11,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.full_name', read_only=True)
     conductor_name = serializers.CharField(source='conductor.full_name', read_only=True)
     location = serializers.ReadOnlyField()
+    trip_type = serializers.CharField(source='trip.trip_type', read_only=True)
     
     class Meta:
         model = Attendance
         fields = [
-            'id', 'student', 'student_name', 'trip', 'conductor', 'conductor_name',
+            'id', 'student', 'student_name', 'trip', 'trip_type', 'conductor', 'conductor_name',
             'event_type', 'timestamp', 'latitude', 'longitude', 'location',
             'confidence_score', 'scan_photo', 'is_manual', 'notes'
         ]

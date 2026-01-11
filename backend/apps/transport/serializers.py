@@ -3,7 +3,7 @@ Serializers for transport app.
 """
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Bus, BusStaff, Route, Stop, Trip, LocationUpdate, TripStatus
+from .models import Bus, BusStaff, Route, Stop, Trip, LocationUpdate, TripStatus, BusFuelEntry, BusExpense, BusEarning
 from apps.accounts.serializers import UserSerializer
 
 
@@ -236,8 +236,8 @@ class TripSerializer(serializers.ModelSerializer):
     """Serializer for Trip model."""
     bus_number = serializers.CharField(source='bus.number', read_only=True)
     route_name = serializers.CharField(source='route.name', read_only=True)
-    driver_name = serializers.CharField(source='driver.full_name', read_only=True)
-    conductor_name = serializers.CharField(source='conductor.full_name', read_only=True)
+    driver_name = serializers.SerializerMethodField()
+    conductor_name = serializers.SerializerMethodField()
     latest_location = serializers.SerializerMethodField()
     
     class Meta:
@@ -250,6 +250,12 @@ class TripSerializer(serializers.ModelSerializer):
             'latest_location', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_driver_name(self, obj):
+        return obj.driver.full_name if obj.driver else None
+
+    def get_conductor_name(self, obj):
+        return obj.conductor.full_name if obj.conductor else None
     
     def get_latest_location(self, obj):
         """Get the latest location update for this trip."""
@@ -322,8 +328,8 @@ class EndTripSerializer(serializers.Serializer):
 
 class UpdateLocationSerializer(serializers.Serializer):
     """Serializer for updating bus location."""
-    latitude = serializers.DecimalField(max_digits=10, decimal_places=7)
-    longitude = serializers.DecimalField(max_digits=10, decimal_places=7)
+    latitude = serializers.DecimalField(max_digits=20, decimal_places=7)
+    longitude = serializers.DecimalField(max_digits=20, decimal_places=7)
     speed = serializers.FloatField(required=False)
     heading = serializers.FloatField(required=False)
     accuracy = serializers.FloatField(required=False)
@@ -360,3 +366,195 @@ class UpdateLocationSerializer(serializers.Serializer):
         )
         
         return location
+
+
+# === BUS PROFILE SERIALIZERS ===
+
+class BusFuelEntrySerializer(serializers.ModelSerializer):
+    """Serializer for BusFuelEntry model."""
+    
+    class Meta:
+        model = BusFuelEntry
+        fields = [
+            'id', 'bus', 'date', 'liters', 'cost', 
+            'odometer_reading', 'notes', 'created_at'
+        ]
+        read_only_fields = ['id', 'bus', 'created_at']
+
+
+class BusExpenseSerializer(serializers.ModelSerializer):
+    """Serializer for BusExpense model."""
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    
+    class Meta:
+        model = BusExpense
+        fields = [
+            'id', 'bus', 'date', 'category', 'category_display',
+            'amount', 'description', 'receipt_url', 'created_at'
+        ]
+        read_only_fields = ['id', 'bus', 'created_at']
+
+
+class BusEarningSerializer(serializers.ModelSerializer):
+    """Serializer for BusEarning model."""
+    earning_type_display = serializers.CharField(source='get_earning_type_display', read_only=True)
+    trip_info = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BusEarning
+        fields = [
+            'id', 'bus', 'date', 'trip', 'trip_info', 'earning_type',
+            'earning_type_display', 'amount', 'description', 'created_at'
+        ]
+        read_only_fields = ['id', 'bus', 'created_at']
+    
+    def get_trip_info(self, obj):
+        if obj.trip:
+            return {
+                'id': str(obj.trip.id),
+                'trip_type': obj.trip.trip_type,
+                'date': obj.trip.scheduled_start.date().isoformat() if obj.trip.scheduled_start else None
+            }
+        return None
+
+
+class BusProfileSerializer(serializers.ModelSerializer):
+    """Comprehensive serializer for Bus Profile page."""
+    staff = BusStaffSerializer(many=True, read_only=True)
+    driver_name = serializers.SerializerMethodField()
+    conductor_name = serializers.SerializerMethodField()
+    age_years = serializers.ReadOnlyField()
+    school_name = serializers.CharField(source='school.name', read_only=True)
+    
+    # Stats
+    total_trips = serializers.SerializerMethodField()
+    total_students = serializers.SerializerMethodField()
+    total_fuel_liters = serializers.SerializerMethodField()
+    total_fuel_cost = serializers.SerializerMethodField()
+    total_expenses = serializers.SerializerMethodField()
+    total_earnings = serializers.SerializerMethodField()
+    active_trip = serializers.SerializerMethodField()
+    routes = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Bus
+        fields = [
+            'id', 'school', 'school_name', 'number', 'registration_number', 
+            'capacity', 'is_active', 'make', 'model', 'year', 'color',
+            'images', 'total_distance_km', 'total_duration_hours',
+            'purchase_date', 'fuel_type', 'age_years',
+            'staff', 'driver_name', 'conductor_name',
+            'total_trips', 'total_students', 'total_fuel_liters', 
+            'total_fuel_cost', 'total_expenses', 'total_earnings',
+            'active_trip', 'routes',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'school', 'created_at', 'updated_at']
+    
+    def get_driver_name(self, obj):
+        driver = obj.staff.filter(role='driver', is_active=True).first()
+        return driver.user.full_name if driver else None
+    
+    def get_conductor_name(self, obj):
+        conductor = obj.staff.filter(role='conductor', is_active=True).first()
+        return conductor.user.full_name if conductor else None
+    
+    def get_total_trips(self, obj):
+        return obj.trips.count()
+    
+    def get_total_students(self, obj):
+        from apps.students.models import Student
+        return Student.objects.filter(route__bus=obj).count()
+    
+    def get_total_fuel_liters(self, obj):
+        from django.db.models import Sum
+        result = obj.fuel_entries.aggregate(total=Sum('liters'))
+        return float(result['total'] or 0)
+    
+    def get_total_fuel_cost(self, obj):
+        from django.db.models import Sum
+        result = obj.fuel_entries.aggregate(total=Sum('cost'))
+        return float(result['total'] or 0)
+    
+    def get_total_expenses(self, obj):
+        from django.db.models import Sum
+        result = obj.expenses.aggregate(total=Sum('amount'))
+        return float(result['total'] or 0)
+    
+    def get_total_earnings(self, obj):
+        from django.db.models import Sum
+        result = obj.earnings.aggregate(total=Sum('amount'))
+        return float(result['total'] or 0)
+    
+    def get_active_trip(self, obj):
+        active = obj.trips.filter(status=TripStatus.IN_PROGRESS).first()
+        if active:
+            return {
+                'id': str(active.id),
+                'trip_type': active.trip_type,
+                'status': active.status,
+                'started_at': active.started_at.isoformat() if active.started_at else None,
+                'students_boarded': active.students_boarded,
+                'students_dropped': active.students_dropped,
+                'total_students': active.total_students,
+            }
+        return None
+    
+    def get_routes(self, obj):
+        routes = Route.objects.filter(bus=obj, is_active=True)
+        return [{
+            'id': str(r.id),
+            'name': r.name,
+            'stops_count': r.stops.count(),
+        } for r in routes]
+
+
+class TripTrackingSerializer(serializers.ModelSerializer):
+    """Serializer for real-time trip tracking."""
+    trip = TripSerializer(source='*', read_only=True)
+    latest_location = serializers.SerializerMethodField()
+    stops = serializers.SerializerMethodField()
+    route_polyline = serializers.CharField(source='route.route_polyline', read_only=True)
+    staff = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Trip
+        fields = [
+            'trip',
+            'latest_location', 
+            'route_polyline', 
+            'stops', 
+            'staff'
+        ]
+        
+    def get_latest_location(self, obj):
+        """Get the latest location update."""
+        latest = obj.location_updates.first()
+        if latest:
+            return {
+                'latitude': float(latest.latitude),
+                'longitude': float(latest.longitude),
+                'speed': latest.speed,
+                'heading': latest.heading,
+                'created_at': latest.created_at
+            }
+        return None
+        
+    def get_stops(self, obj):
+        """Get ordered stops with lat/lng for waypoints."""
+        stops = obj.route.stops.filter(is_active=True).order_by('sequence')
+        return StopSerializer(stops, many=True).data
+
+    def get_staff(self, obj):
+        """Get staff contact info."""
+        return {
+            'driver': {
+                'name': obj.driver.full_name,
+                'phone': obj.driver.phone
+            } if obj.driver else None,
+            'conductor': {
+                'name': obj.conductor.full_name,
+                'phone': obj.conductor.phone
+            } if obj.conductor else None
+        }
+

@@ -9,6 +9,13 @@ class Bus(BaseModel):
     """
     Model representing a school bus.
     """
+    FUEL_TYPE_CHOICES = [
+        ('petrol', 'Petrol'),
+        ('diesel', 'Diesel'),
+        ('cng', 'CNG'),
+        ('electric', 'Electric'),
+    ]
+    
     school = models.ForeignKey(
         'schools.School',
         on_delete=models.CASCADE,
@@ -31,6 +38,27 @@ class Bus(BaseModel):
     year = models.PositiveIntegerField(null=True, blank=True)
     color = models.CharField(max_length=50, blank=True)
     
+    # === NEW FIELDS FOR BUS PROFILE ===
+    # Images (stored as JSON array of URLs)
+    images = models.JSONField(default=list, blank=True)
+    
+    # Telemetry (auto-calculated from trips)
+    total_distance_km = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Total distance traveled in kilometers"
+    )
+    total_duration_hours = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Total time traveled in hours"
+    )
+    
+    # Vehicle lifecycle
+    purchase_date = models.DateField(null=True, blank=True,
+        help_text="Date when bus was purchased (for age calculation)")
+    fuel_type = models.CharField(
+        max_length=20, choices=FUEL_TYPE_CHOICES, default='diesel'
+    )
+    
     class Meta:
         db_table = 'buses'
         verbose_name = 'Bus'
@@ -39,6 +67,15 @@ class Bus(BaseModel):
     
     def __str__(self):
         return f"{self.number} ({self.registration_number})"
+    
+    @property
+    def age_years(self):
+        """Calculate bus age from purchase_date"""
+        if self.purchase_date:
+            from datetime import date
+            today = date.today()
+            return (today - self.purchase_date).days // 365
+        return None
 
 
 class BusStaff(BaseModel):
@@ -231,6 +268,16 @@ class Trip(BaseModel):
     students_boarded = models.PositiveIntegerField(default=0)
     students_dropped = models.PositiveIntegerField(default=0)
     
+    # Telemetry
+    distance_traveled = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Distance traveled in this trip (km)"
+    )
+    duration_minutes = models.PositiveIntegerField(
+        default=0,
+        help_text="Duration of trip in minutes"
+    )
+    
     class Meta:
         db_table = 'trips'
         verbose_name = 'Trip'
@@ -286,3 +333,107 @@ class LocationUpdate(BaseModel):
             'latitude': float(self.latitude),
             'longitude': float(self.longitude)
         }
+
+
+class BusFuelEntry(BaseModel):
+    """
+    Track fuel usage entries for a bus.
+    """
+    bus = models.ForeignKey(
+        Bus,
+        on_delete=models.CASCADE,
+        related_name='fuel_entries'
+    )
+    date = models.DateField()
+    liters = models.DecimalField(max_digits=8, decimal_places=2)
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+    odometer_reading = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Odometer reading at time of fill"
+    )
+    notes = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'bus_fuel_entries'
+        verbose_name = 'Bus Fuel Entry'
+        verbose_name_plural = 'Bus Fuel Entries'
+        ordering = ['-date']
+    
+    def __str__(self):
+        return f"{self.bus.number} - {self.liters}L on {self.date}"
+
+
+class BusExpense(BaseModel):
+    """
+    Track all expenses for a bus (maintenance, insurance, repairs, etc.).
+    """
+    CATEGORY_CHOICES = [
+        ('fuel', 'Fuel'),
+        ('maintenance', 'Maintenance'),
+        ('insurance', 'Insurance'),
+        ('repair', 'Repair'),
+        ('tax', 'Tax/Registration'),
+        ('cleaning', 'Cleaning'),
+        ('salary', 'Staff Salary'),
+        ('parking', 'Parking/Toll'),
+        ('other', 'Other'),
+    ]
+    
+    bus = models.ForeignKey(
+        Bus,
+        on_delete=models.CASCADE,
+        related_name='expenses'
+    )
+    date = models.DateField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.TextField()
+    receipt_url = models.CharField(max_length=500, blank=True,
+        help_text="URL to uploaded receipt image")
+    
+    class Meta:
+        db_table = 'bus_expenses'
+        verbose_name = 'Bus Expense'
+        verbose_name_plural = 'Bus Expenses'
+        ordering = ['-date']
+    
+    def __str__(self):
+        return f"{self.bus.number} - {self.category}: ₹{self.amount}"
+
+
+class BusEarning(BaseModel):
+    """
+    Track earnings associated with a bus.
+    """
+    EARNING_TYPE_CHOICES = [
+        ('trip', 'Trip Fee'),
+        ('monthly', 'Monthly Subscription'),
+        ('special', 'Special Trip'),
+        ('other', 'Other'),
+    ]
+    
+    bus = models.ForeignKey(
+        Bus,
+        on_delete=models.CASCADE,
+        related_name='earnings'
+    )
+    date = models.DateField()
+    trip = models.ForeignKey(
+        'Trip',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='earnings',
+        help_text="Link to specific trip if applicable"
+    )
+    earning_type = models.CharField(max_length=20, choices=EARNING_TYPE_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.TextField(blank=True)
+    
+    class Meta:
+        db_table = 'bus_earnings'
+        verbose_name = 'Bus Earning'
+        verbose_name_plural = 'Bus Earnings'
+        ordering = ['-date']
+    
+    def __str__(self):
+        return f"{self.bus.number} - {self.earning_type}: ₹{self.amount}"
