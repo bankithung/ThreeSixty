@@ -83,11 +83,23 @@ class StudentListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Student
+    age = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Student
         fields = [
             'id', 'admission_number', 'first_name', 'last_name', 'full_name', 
             'grade', 'section', 'photo', 'route', 'route_name', 'is_active', 'has_face',
-            'school', 'pickup_address', 'pickup_latitude', 'pickup_longitude'
+            'school', 'pickup_address', 'pickup_latitude', 'pickup_longitude',
+            'gender', 'age'
         ]
+    
+    def get_age(self, obj):
+        import datetime
+        if not obj.date_of_birth:
+            return None
+        today = datetime.date.today()
+        return today.year - obj.date_of_birth.year - ((today.month, today.day) < (obj.date_of_birth.month, obj.date_of_birth.day))
     
     def get_has_face(self, obj):
         """Check if student has face encoding."""

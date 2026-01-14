@@ -39,9 +39,9 @@ export default function Login() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
-                        <span className="text-2xl font-bold text-primary-600">360°</span>
+                        <span className="text-2xl font-bold text-primary-600">D</span>
                     </div>
-                    <h1 className="text-3xl font-bold text-white">ThreeSixty</h1>
+                    <h1 className="text-3xl font-bold text-white">Doxaed</h1>
                     <p className="text-white/80 mt-1">Admin Portal</p>
                 </div>
 
@@ -113,7 +113,7 @@ export default function Login() {
                 </div>
 
                 <p className="text-center text-white/70 text-sm mt-6">
-                    © 2024 ThreeSixty. All rights reserved.
+                    © 2024 Doxaed. All rights reserved.
                 </p>
             </div>
         </div>

@@ -76,14 +76,24 @@ export const schoolsAPI = {
     list: (params?: any) => api.get('/schools/', { params }),
     get: (id: string) => api.get(`/schools/${id}/`),
     create: (data: any) => api.post('/schools/', data),
-    update: (id: string, data: any) => api.patch(`/schools/${id}/`, data),
+    update: (id: string, data: any) => {
+        // Check if data is FormData (for file uploads) and set appropriate headers
+        const config = data instanceof FormData
+            ? { headers: { 'Content-Type': 'multipart/form-data' } }
+            : {}
+        return api.patch(`/schools/${id}/`, data, config)
+    },
     delete: (id: string) => api.delete(`/schools/${id}/`),
+    block: (id: string, action: 'block' | 'unblock') => api.post(`/schools/${id}/block/`, { action }),
     getStats: (id: string) => api.get(`/schools/${id}/stats/`),
 }
 
 // ========== STUDENTS ==========
 export const studentsAPI = {
     list: (params?: any) => api.get('/students/', { params }),
+    bulkUpdate: (data: { student_ids: string[], updates: any }) =>
+        api.post('/students/bulk-update/', data), // Note: Need to verify if this endpoint exists, or loop individually
+
     get: (id: string) => api.get(`/students/${id}/`),
     create: (data: any) => api.post('/students/', data),
     update: (id: string, data: any) => api.patch(`/students/${id}/`, data),
@@ -235,8 +245,20 @@ export const reportsAPI = {
 // ========== SUBSCRIPTIONS ==========
 export const subscriptionsAPI = {
     listFeatures: () => api.get('/subscriptions/features/'),
-    listSubscriptions: () => api.get('/subscriptions/subscriptions/'),
+    getFeature: (id: string) => api.get(`/subscriptions/features/${id}/`),
+    createFeature: (data: any) => api.post('/subscriptions/features/', data),
+    updateFeature: (id: string, data: any) => api.patch(`/subscriptions/features/${id}/`, data),
+    deleteFeature: (id: string) => api.delete(`/subscriptions/features/${id}/`),
+
+    listSubscriptions: (params?: any) => api.get('/subscriptions/subscriptions/', { params }),
     getMySubscriptions: () => api.get('/subscriptions/subscriptions/my_subscriptions/'),
     createSubscription: (data: any) => api.post('/subscriptions/subscriptions/', data),
     updateSubscription: (id: string, data: any) => api.patch(`/subscriptions/subscriptions/${id}/`, data),
+}
+
+export const transactionsAPI = {
+    list: (params?: any) => api.get('/subscriptions/transactions/', { params }),
+    stats: () => api.get('/subscriptions/transactions/stats/'),
+    create: (data: any) => api.post('/subscriptions/transactions/', data),
+    update: (id: string, data: any) => api.patch(`/subscriptions/transactions/${id}/`, data),
 }

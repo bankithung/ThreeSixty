@@ -15,6 +15,9 @@ interface StopMapEditorProps {
     stops: Stop[]
     onSave: (stops: Stop[]) => void
     isSaving?: boolean
+    onChange?: (stops: Stop[]) => void
+    hideSaveButton?: boolean
+    heightClass?: string
 }
 
 declare global {
@@ -23,7 +26,7 @@ declare global {
     }
 }
 
-export default function StopMapEditor({ stops: initialStops, onSave, isSaving }: StopMapEditorProps) {
+export default function StopMapEditor({ stops: initialStops, onSave, isSaving, onChange, hideSaveButton, heightClass }: StopMapEditorProps) {
     const mapRef = useRef<HTMLDivElement>(null)
     const mapInstance = useRef<any>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
@@ -90,10 +93,15 @@ export default function StopMapEditor({ stops: initialStops, onSave, isSaving }:
                     mapInstance.current.setZoom(17)
                 }
 
-                // If in adding mode, prompt to add stop here
-                if (isAddingMode) {
-                    handleAddStop(place.geometry.location.lat(), place.geometry.location.lng(), place.name, place.formatted_address)
-                }
+                // If place selected, ALWAYS add it or prompt? 
+                // UX decision: If user searches specific place, they likely want to add it.
+                // Let's add it directly.
+                handleAddStop(
+                    place.geometry.location.lat(),
+                    place.geometry.location.lng(),
+                    place.name,
+                    place.formatted_address
+                )
             })
         }
     }, [])
@@ -212,6 +220,7 @@ export default function StopMapEditor({ stops: initialStops, onSave, isSaving }:
         }
 
         setStops([...stops, newStop])
+        onChange?.([...stops, newStop])
         toast.success('Stop added')
         setIsAddingMode(false) // Exit adding mode after adding
     }
@@ -220,6 +229,7 @@ export default function StopMapEditor({ stops: initialStops, onSave, isSaving }:
         const newStops = [...stops]
         newStops[index] = { ...newStops[index], latitude: lat, longitude: lng }
         setStops(newStops)
+        onChange?.(newStops)
     }
 
     const handleDeleteStop = (index: number) => {
@@ -227,10 +237,11 @@ export default function StopMapEditor({ stops: initialStops, onSave, isSaving }:
         // Re-index orders
         const reorderedStops = newStops.map((stop, i) => ({ ...stop, order: i + 1 }))
         setStops(reorderedStops)
+        onChange?.(reorderedStops)
     }
 
     return (
-        <div className="flex h-[600px] bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+        <div className={`flex ${heightClass || 'h-[600px]'} bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200`}>
             {/* Sidebar List */}
             <div className="w-80 flex flex-col border-r border-gray-200 bg-gray-50">
                 <div className="p-4 border-b bg-white">
@@ -265,6 +276,7 @@ export default function StopMapEditor({ stops: initialStops, onSave, isSaving }:
                                                 const newStops = [...stops]
                                                 newStops[index].name = e.target.value
                                                 setStops(newStops)
+                                                onChange?.(newStops)
                                             }}
                                             className="w-full text-sm font-medium text-gray-900 bg-transparent border-none p-0 focus:ring-0 hover:bg-gray-100 rounded px-1 -ml-1 transition-colors"
                                             placeholder="Stop name..."
@@ -307,17 +319,19 @@ export default function StopMapEditor({ stops: initialStops, onSave, isSaving }:
                         {isAddingMode ? <><FiMapPin /> Click Map to Add</> : <><FiPlus /> Add New Stop</>}
                     </button>
 
-                    <button
-                        onClick={() => {
-                            console.log('Saving route with stops:', stops)
-                            onSave(stops)
-                        }}
-                        disabled={isSaving}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
-                    >
-                        {isSaving ? <span className="animate-spin">⏳</span> : <FiSave />}
-                        Save Route
-                    </button>
+                    {!hideSaveButton && (
+                        <button
+                            onClick={() => {
+                                console.log('Saving route with stops:', stops)
+                                onSave(stops)
+                            }}
+                            disabled={isSaving}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
+                        >
+                            {isSaving ? <span className="animate-spin">⏳</span> : <FiSave />}
+                            Save Route
+                        </button>
+                    )}
                 </div>
             </div>
 

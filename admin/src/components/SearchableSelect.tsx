@@ -80,10 +80,10 @@ export default function SearchableSelect({
                                         setIsOpen(false)
                                         setSearchTerm('')
                                     }}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors ${value === option ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors ${value === option ? 'bg-primary-50 text-primary-700' : 'text-gray-900'
                                         }`}
                                 >
-                                    <span className="truncate">{option}</span>
+                                    <span>{option}</span>
                                     {value === option && <FiCheck className="text-primary-500" />}
                                 </button>
                             ))

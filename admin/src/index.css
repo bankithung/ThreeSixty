@@ -6,7 +6,7 @@
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light dark;
+  color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,7 +19,7 @@ body {
   background-color: #F5F5F5;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar (Global) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -38,21 +38,85 @@ body {
   background: #a1a1a1;
 }
 
+/* Thinner scrollbar for dropdowns/sidebars */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideIn {
-  from { transform: translateY(-10px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
 
-.animate-slide-in {
-  animation: slideIn 0.3s ease-in-out;
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm;
+  }
+
+  .btn-white {
+    @apply inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm;
+  }
+
+  .btn-black {
+    @apply inline-flex items-center px-4 py-2 bg-gray-900 border border-transparent rounded-lg font-medium text-white hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors shadow-sm;
+  }
+
+  .input-field {
+    @apply block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm text-gray-900 bg-white p-2.5 border;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+
+  .label-required {
+    @apply block text-sm font-medium text-gray-700 mb-1 after:content-['*'] after:ml-0.5 after:text-red-500;
+  }
+}
+
+/* Autofill styling overrides */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
 }

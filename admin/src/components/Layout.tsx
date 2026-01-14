@@ -32,6 +32,14 @@ const bottomNavigation = [
     { name: 'Settings', href: '/settings', icon: FiSettings },
 ]
 
+const rootNavigation = [
+    { name: 'Dashboard', href: '/', icon: FiHome },
+    { name: 'Schools', href: '/schools', icon: FiBook },
+    { name: 'Global Finance', href: '/finance', icon: FiActivity },
+    { name: 'Features & Pricing', href: '/features', icon: FiSettings },
+    { name: 'Settings', href: '/settings', icon: FiSettings },
+]
+
 export default function Layout() {
     const { user, logout } = useAuth()
     const location = useLocation()
@@ -42,21 +50,19 @@ export default function Layout() {
     const { data: featuresData } = useQuery({
         queryKey: ['mySubscriptions'],
         queryFn: () => subscriptionsAPI.getMySubscriptions(),
-        enabled: !!user,
+        enabled: !!user && user.role !== 'root_admin', // Don't fetch this for root admin or handle differently
     })
 
     const activeFeatures = featuresData?.data || []
-    const hasBusTracking = activeFeatures.includes('bus_tracking') || user?.role === 'root_admin'
+    const hasBusTracking = (activeFeatures.includes('bus_tracking') || user?.role === 'root_admin') && user?.role !== 'root_admin' // Only show bus tracking in sidebar for School Admin, Root Admin accesses via School Detail
 
     // Filter base navigation
     const filteredBaseNav = baseNavigation.filter(item =>
-        !item.adminOnly || user?.role === 'root_admin'
+        !item.adminOnly || user?.role === 'school_admin'
     )
 
-    // Filter bottom navigation (hide Marketplace for Root Admin, or maybe keep it for managing subs?)
-    // User said "allow the root admin to see all the subscriptions and manage". So maybe Marketplace is for School Admin to buy, 
-    // and Root Admin has a different view or uses the same page differently? 
-    // I'll keep Marketplace visible for everyone for now, logic inside page will differ.
+    const isRootAdmin = user?.role === 'root_admin'
+    const navigationItems = isRootAdmin ? rootNavigation : filteredBaseNav
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -77,9 +83,9 @@ export default function Layout() {
                 <div className="flex items-center h-16 px-6 border-b">
                     <div className="flex items-center">
                         <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
-                            <span className="text-white font-bold text-sm">360</span>
+                            <span className="text-white font-bold text-sm">D</span>
                         </div>
-                        <span className="ml-2 text-lg font-semibold text-gray-800">ThreeSixty</span>
+                        <span className="ml-2 text-lg font-semibold text-gray-800">Doxaed</span>
                     </div>
                     <button
                         className="ml-auto lg:hidden"
@@ -91,7 +97,7 @@ export default function Layout() {
 
                 {/* Navigation */}
                 <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)]">
-                    {filteredBaseNav.map((item) => {
+                    {navigationItems.map((item) => {
                         const isActive = location.pathname === item.href
                         return (
                             <Link
@@ -109,8 +115,8 @@ export default function Layout() {
                         )
                     })}
 
-                    {/* Transport Module Group */}
-                    {hasBusTracking && (
+                    {/* Transport Module Group - Only for School Admin */}
+                    {!isRootAdmin && hasBusTracking && (
                         <div className="pt-2">
                             <button
                                 onClick={() => setTransportOpen(!transportOpen)}
@@ -144,25 +150,27 @@ export default function Layout() {
                         </div>
                     )}
 
-                    <div className="pt-2 border-t mt-2">
-                        {bottomNavigation.map((item) => {
-                            const isActive = location.pathname === item.href
-                            return (
-                                <Link
-                                    key={item.name}
-                                    to={item.href}
-                                    className={`flex items-center px-4 py-2.5 rounded-lg transition-colors ${isActive
-                                        ? 'bg-primary-50 text-primary-600'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    onClick={() => setSidebarOpen(false)}
-                                >
-                                    <item.icon className={`w-5 h-5 ${isActive ? 'text-primary-500' : ''}`} />
-                                    <span className="ml-3 font-medium">{item.name}</span>
-                                </Link>
-                            )
-                        })}
-                    </div>
+                    {!isRootAdmin && (
+                        <div className="pt-2 border-t mt-2">
+                            {bottomNavigation.map((item) => {
+                                const isActive = location.pathname === item.href
+                                return (
+                                    <Link
+                                        key={item.name}
+                                        to={item.href}
+                                        className={`flex items-center px-4 py-2.5 rounded-lg transition-colors ${isActive
+                                            ? 'bg-primary-50 text-primary-600'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        onClick={() => setSidebarOpen(false)}
+                                    >
+                                        <item.icon className={`w-5 h-5 ${isActive ? 'text-primary-500' : ''}`} />
+                                        <span className="ml-3 font-medium">{item.name}</span>
+                                    </Link>
+                                )
+                            })}
+                        </div>
+                    )}
                 </nav>
 
                 {/* User section */}
@@ -205,7 +213,7 @@ export default function Layout() {
                         </button>
                         <h1 className="ml-4 lg:ml-0 text-xl font-semibold text-gray-800">
                             {/* Dynamic Header Logic */}
-                            {[...baseNavigation, ...transportNavigation, ...bottomNavigation].find(n => n.href === location.pathname)?.name || 'Dashboard'}
+                            {[...baseNavigation, ...transportNavigation, ...bottomNavigation, ...rootNavigation].find(n => n.href === location.pathname)?.name || 'Dashboard'}
                         </h1>
                     </div>
                 </header>

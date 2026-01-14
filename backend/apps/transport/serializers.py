@@ -33,6 +33,7 @@ class BusSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'school', 'school_id', 'number', 'registration_number', 'capacity',
             'is_active', 'make', 'model', 'year', 'color',
+            'insurance_expiry_date', 'fitness_expiry_date', 'last_maintenance_date',
             'staff', 'driver_id', 'conductor_id', 'current_trip', 'student_count',
             'created_at', 'updated_at'
         ]
@@ -441,6 +442,7 @@ class BusProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'school', 'school_name', 'number', 'registration_number', 
             'capacity', 'is_active', 'make', 'model', 'year', 'color',
+            'insurance_expiry_date', 'fitness_expiry_date', 'last_maintenance_date',
             'images', 'total_distance_km', 'total_duration_hours',
             'purchase_date', 'fuel_type', 'age_years',
             'staff', 'driver_name', 'conductor_name',

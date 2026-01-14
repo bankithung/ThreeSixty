@@ -1,22 +1,29 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { routesAPI, busesAPI, accountsAPI, schoolsAPI } from '../lib/api'
 import toast from 'react-hot-toast'
-import { FiPlus, FiSearch, FiEdit, FiTrash2, FiMapPin, FiChevronRight, FiX } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiEdit, FiTrash2, FiMapPin, FiChevronRight, FiX, FiArrowLeft, FiNavigation } from 'react-icons/fi'
 import { useAuth } from '../hooks/useAuth'
+import { useNavigate } from 'react-router-dom'
+import LiveBusTrackingModal from '../components/LiveBusTrackingModal'
 
 export default function Routes() {
     const { user } = useAuth()
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const schoolId = searchParams.get('school')
     const queryClient = useQueryClient()
     const [search, setSearch] = useState('')
     const [selectedRoute, setSelectedRoute] = useState<any>(null)
     const [showRouteModal, setShowRouteModal] = useState(false)
     const [showStopModal, setShowStopModal] = useState(false)
     const [editingRoute, setEditingRoute] = useState<any>(null)
+    const [trackingBus, setTrackingBus] = useState<{ id: string, number: string } | null>(null)
 
     const { data: routesData, isLoading } = useQuery({
-        queryKey: ['routes', search],
-        queryFn: () => routesAPI.list({ search }),
+        queryKey: ['routes', search, schoolId],
+        queryFn: () => routesAPI.list({ search, school_id: schoolId }),
     })
 
     const { data: stopsData } = useQuery({
@@ -34,23 +41,30 @@ export default function Routes() {
         },
     })
 
+    /*
     const deleteStopMutation = useMutation({
         mutationFn: ({ routeId, stopId }: { routeId: string, stopId: string }) =>
-            routesAPI.deleteStop(routeId, stopId), // Assuming delete stop API exists or is handled
+            routesAPI.deleteStop(routeId, stopId),
         onSuccess: () => {
-            // If deleteStop isn't in api.ts, this might fail. I need to check API.
-            // Checking API: routesAPI has getStops, addStop. NO deleteStop!
-            // I will leave this for now or stub it.
             queryClient.invalidateQueries({ queryKey: ['routeStops'] })
             toast.success('Stop deleted')
         }
     })
+    */
 
     const routes = routesData?.data?.results || routesData?.data || []
     const stops = stopsData?.data || []
 
     return (
         <div className="space-y-6 animate-fade-in">
+            <button
+                onClick={() => navigate(-1)}
+                className="flex items-center text-gray-500 hover:text-gray-700 transition-colors"
+            >
+                <FiArrowLeft className="mr-2" />
+                Back
+            </button>
+
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
@@ -98,9 +112,24 @@ export default function Routes() {
                                             <h3 className="font-medium text-gray-800">{route.name}</h3>
                                             <p className="text-sm text-gray-500">{route.total_stops} stops • {route.bus_number || 'No Bus'}</p>
                                         </div>
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${route.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {route.is_active ? 'Active' : 'Inactive'}
-                                        </span>
+                                        {/* Action Buttons */}
+                                        <div className="flex items-center gap-2 mr-4">
+                                            {route.bus && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setTrackingBus({ id: route.bus, number: route.bus_number })
+                                                    }}
+                                                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Track Live"
+                                                >
+                                                    <FiNavigation className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${route.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                {route.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
                                         <FiChevronRight className="ml-4 text-gray-400" />
                                     </div>
                                 ))}
@@ -190,9 +219,18 @@ export default function Routes() {
                     currentOrder={stops.length + 1}
                 />
             )}
+
+            {/* Live Tracking Modal */}
+            <LiveBusTrackingModal
+                isOpen={!!trackingBus}
+                onClose={() => setTrackingBus(null)}
+                busId={trackingBus?.id || ''}
+                busNumber={trackingBus?.number || ''}
+            />
         </div>
     )
 }
+
 
 function RouteModal({ onClose, initialData, userRole }: { onClose: () => void; initialData?: any; userRole?: string }) {
     const queryClient = useQueryClient()

@@ -87,7 +87,7 @@ export default function Marketplace() {
                                             <FiPackage className="w-6 h-6 text-blue-600" />
                                         )}
                                     </div>
-                                    <span className="text-lg font-bold text-gray-900">${feature.price}</span>
+                                    <span className="text-lg font-bold text-gray-900">₹{feature.price}</span>
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.name}</h3>
                                 <p className="text-gray-500 text-sm mb-6 min-h-[60px]">{feature.description}</p>

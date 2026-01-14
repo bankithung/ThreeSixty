@@ -81,9 +81,13 @@ class StudentListCreateView(generics.ListCreateAPIView):
             )
         
         # Filter by active status
-        is_active = self.request.query_params.get('is_active')
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        # Filter by unassigned (no route)
+        unassigned = self.request.query_params.get('unassigned')
+        if unassigned and unassigned.lower() == 'true':
+            queryset = queryset.filter(route__isnull=True)
         
         return queryset
 

@@ -58,6 +58,14 @@ class Bus(BaseModel):
     fuel_type = models.CharField(
         max_length=20, choices=FUEL_TYPE_CHOICES, default='diesel'
     )
+
+    # Compliance & Maintenance
+    insurance_expiry_date = models.DateField(null=True, blank=True,
+        help_text="Date when insurance policy expires")
+    fitness_expiry_date = models.DateField(null=True, blank=True,
+        help_text="Date when fitness certificate expires")
+    last_maintenance_date = models.DateField(null=True, blank=True,
+        help_text="Date of last scheduled maintenance")
     
     class Meta:
         db_table = 'buses'
