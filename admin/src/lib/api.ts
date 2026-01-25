@@ -92,9 +92,10 @@ export const schoolsAPI = {
 export const studentsAPI = {
     list: (params?: any) => api.get('/students/', { params }),
     bulkUpdate: (data: { student_ids: string[], updates: any }) =>
-        api.post('/students/bulk-update/', data), // Note: Need to verify if this endpoint exists, or loop individually
+        api.post('/students/bulk-update/', data),
 
     get: (id: string) => api.get(`/students/${id}/`),
+    getComprehensive: (id: string) => api.get(`/students/${id}/comprehensive/`),
     create: (data: any) => api.post('/students/', data),
     update: (id: string, data: any) => api.patch(`/students/${id}/`, data),
     delete: (id: string) => api.delete(`/students/${id}/`),
@@ -104,6 +105,35 @@ export const studentsAPI = {
         }),
     getFaceEncodings: (id: string) => api.get(`/students/${id}/faces/`),
     enroll: (data: any) => api.post('/students/enroll/', data),
+    
+    // Comprehensive admission (full workflow)
+    admit: (data: any) => api.post('/students/admit/', data),
+    
+    // Health records
+    getHealth: (id: string) => api.get(`/students/${id}/health/`),
+    updateHealth: (id: string, data: any) => api.put(`/students/${id}/health/`, data),
+    
+    // Documents
+    getDocuments: (id: string) => api.get(`/students/${id}/documents/`),
+    uploadDocument: (id: string, formData: FormData) =>
+        api.post(`/students/${id}/documents/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }),
+    deleteDocument: (docId: string) => api.delete(`/students/documents/${docId}/`),
+    verifyDocument: (docId: string) => 
+        api.patch(`/students/documents/${docId}/`, { is_verified: true }),
+    
+    // Authorized pickups
+    getAuthorizedPickups: (id: string) => api.get(`/students/${id}/authorized-pickups/`),
+    addAuthorizedPickup: (id: string, formData: FormData) =>
+        api.post(`/students/${id}/authorized-pickups/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }),
+    updateAuthorizedPickup: (pickupId: string, data: any) =>
+        api.patch(`/students/authorized-pickups/${pickupId}/`, data),
+    deleteAuthorizedPickup: (pickupId: string) =>
+        api.delete(`/students/authorized-pickups/${pickupId}/`),
+    
     identifyStudent: (formData: FormData) =>
         api.post('/students/identify/', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
@@ -119,9 +149,20 @@ export const parentsAPI = {
 export const staffAPI = {
     list: (params?: any) => api.get('/auth/staff/', { params }),
     get: (id: string) => api.get(`/auth/staff/${id}/`),
-    create: (data: any) => api.post('/auth/staff/create/', data),
-    update: (id: string, data: any) => api.patch(`/auth/staff/${id}/`, data),
+    create: (data: any) => {
+        const config = data instanceof FormData
+            ? { headers: { 'Content-Type': 'multipart/form-data' } }
+            : {}
+        return api.post('/auth/staff/create/', data, config)
+    },
+    update: (id: string, data: any) => {
+        const config = data instanceof FormData
+            ? { headers: { 'Content-Type': 'multipart/form-data' } }
+            : {}
+        return api.patch(`/auth/staff/${id}/`, data, config)
+    },
     delete: (id: string) => api.delete(`/auth/staff/${id}/`),
+    getTransportAnalytics: (id: string) => api.get(`/transport/staff-analytics/${id}/`),
 }
 
 // ========== BUSES ==========

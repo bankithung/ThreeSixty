@@ -118,6 +118,9 @@ class SchoolStatsView(APIView):
             'total_staff': SchoolMembership.objects.filter(
                 school=school, is_active=True
             ).exclude(role=UserRole.PARENT).count(),
+            'total_teachers': SchoolMembership.objects.filter(
+                school=school, role=UserRole.TEACHER, is_active=True
+            ).count(),
             'total_conductors': SchoolMembership.objects.filter(
                 school=school, role=UserRole.CONDUCTOR, is_active=True
             ).count(),
@@ -173,35 +176,34 @@ class SchoolDashboardView(APIView):
     
     def get(self, request):
         from apps.students.models import Student
-        from apps.transport.models import Bus, Route
+        from apps.transport.models import Bus, Route, Trip, TripStatus, BusExpense, BusEarning
         from apps.accounts.models import SchoolMembership, UserRole
         from apps.subscriptions.models import Subscription, Transaction
-        from django.db.models import Sum, Count, F
-        from django.db.models.functions import TruncMonth
+        from apps.attendance.models import Attendance, EventType
+        from django.db.models import Sum, Count, Q
+        from django.db.models.functions import TruncMonth, TruncDate
         from django.utils import timezone
         from datetime import timedelta
 
-        # Root Admin: Global Stats
+        # Root Admin: Global Stats (Kept as is)
         if request.user.role == UserRole.ROOT_ADMIN:
              # Basic Counts
              total_schools = School.objects.count()
              active_schools = School.objects.filter(is_active=True).count()
              blocked_schools = School.objects.filter(is_active=False).count()
              
-             # Calculate MRR (Monthly Recurring Revenue) from active subscriptions
-             # Assuming Subscription.feature.price is monthly
+             # MRR
              mrr = Subscription.objects.filter(is_active=True).aggregate(
                  total=Sum('feature__price')
              )['total'] or 0
 
-             # Total Users (Students + Staff + Admins)
-             # Filter Active only and exclude Parents from staff count
+             # Users
              total_students = Student.objects.filter(is_active=True).count()
              total_staff = SchoolMembership.objects.filter(
                  is_active=True
              ).exclude(role=UserRole.PARENT).count()
              
-             # Recent Activity (Last 5 newly created schools)
+             # Recent Activity
              recent_schools = School.objects.order_by('-created_at')[:5]
              recent_activity = [{
                  'id': s.id,
@@ -212,7 +214,7 @@ class SchoolDashboardView(APIView):
                  'status': 'Active' if s.is_active else 'Blocked'
              } for s in recent_schools]
 
-             # Growth Chart: New Schools per Month (Last 6 months)
+             # Charts
              six_months_ago = timezone.now() - timedelta(days=180)
              school_growth = School.objects.filter(created_at__gte=six_months_ago)\
                  .annotate(month=TruncMonth('created_at'))\
@@ -220,20 +222,12 @@ class SchoolDashboardView(APIView):
                  .annotate(count=Count('id'))\
                  .order_by('month')
             
-             # Revenue Growth (Real Transactions)
              revenue_growth = Transaction.objects.filter(transaction_date__gte=six_months_ago, status='paid')\
                  .annotate(month=TruncMonth('transaction_date'))\
                  .values('month')\
                  .annotate(total=Sum('amount'))\
                  .order_by('month')
             
-             # MRR (Last 30 days paid transactions)
-             thirty_days_ago = timezone.now() - timedelta(days=30)
-             mrr = Transaction.objects.filter(
-                 status='paid', 
-                 transaction_date__gte=thirty_days_ago
-             ).aggregate(total=Sum('amount'))['total'] or 0
-
              stats = {
                 'total_schools': total_schools,
                 'active_schools': active_schools,
@@ -250,7 +244,7 @@ class SchoolDashboardView(APIView):
             }
              return Response(stats)
 
-        # School Admin: School Specific Stats
+        # School Admin: Detailed School Specific Stats
         try:
             membership = SchoolMembership.objects.get(
                 user=request.user, 
@@ -261,21 +255,126 @@ class SchoolDashboardView(APIView):
         except SchoolMembership.DoesNotExist:
              return Response({'error': 'No active school membership'}, status=403)
         
-        # School Admin Stats...
+        today = timezone.localdate()
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # 0. Active Features & Branding
+        active_features = Subscription.objects.filter(
+            school=school, 
+            is_active=True
+        ).values_list('feature__code', flat=True)
+        
+        school_logo = request.build_absolute_uri(school.logo.url) if school.logo else None
+
+        # 1. Overview Counts
+        total_students = Student.objects.filter(school=school, is_active=True).count()
+        total_staff = SchoolMembership.objects.filter(school=school, is_active=True).exclude(role=UserRole.PARENT).count()
+        total_buses = Bus.objects.filter(school=school, is_active=True).count()
+        
+        # 2. Attendance (Today)
+        # Unique students who generated a checkin event today
+        present_count = Attendance.objects.filter(
+            student__school=school,
+            timestamp__date=today,
+            event_type=EventType.CHECKIN
+        ).values('student').distinct().count()
+        
+        attendance_percentage = (present_count / total_students * 100) if total_students > 0 else 0
+        
+        # 3. Trip Status (Today)
+        # Only calculate if TRANSPORT feature is active to save query, or just calculate generally
+        todays_trips = Trip.objects.filter(
+            bus__school=school, 
+            scheduled_start__date=today
+        )
+        trip_stats = {
+            'total': todays_trips.count(),
+            'scheduled': todays_trips.filter(status=TripStatus.SCHEDULED).count(),
+            'in_progress': todays_trips.filter(status=TripStatus.IN_PROGRESS).count(),
+            'completed': todays_trips.filter(status=TripStatus.COMPLETED).count(),
+            'cancelled': todays_trips.filter(status=TripStatus.CANCELLED).count(),
+        }
+
+        # 4. Financials (Current Month)
+        current_month_start = today.replace(day=1)
+        
+        monthly_earnings = BusEarning.objects.filter(
+            bus__school=school, date__gte=current_month_start
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        monthly_expenses = BusExpense.objects.filter(
+            bus__school=school, date__gte=current_month_start
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        # 5. Charts Logic (Last 7 Days Attendance)
+        last_7_days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+        attendance_chart = []
+        for d in last_7_days:
+            count = Attendance.objects.filter(
+                student__school=school,
+                timestamp__date=d,
+                event_type=EventType.CHECKIN
+            ).values('student').distinct().count()
+            attendance_chart.append({
+                'date': d.strftime('%Y-%m-%d'),
+                'count': count
+            })
+
+        # 6. Recent Trips (Live Status)
+        recent_trips = Trip.objects.filter(
+            bus__school=school,
+            scheduled_start__gte=today_start
+        ).select_related('bus', 'route', 'driver').order_by('-scheduled_start')[:5]
+        
+        recent_trips_data = [{
+            'id': t.id,
+            'bus': t.bus.number,
+            'route': t.route.name,
+            'driver': t.driver.full_name if t.driver else 'Unassigned',
+            'status': t.status,
+            'time': t.scheduled_start,
+            'passengers': f"{t.students_boarded}/{t.total_students}" if t.status in ['in_progress', 'completed'] else f"Est. {t.total_students}"
+        } for t in recent_trips]
+
+        # 7. Notifications / Alerts
+        # Fetch high priority notifications or recent ones for the user (School Admin)
+        from apps.notifications.models import Notification, NotificationType
+        recent_notifications = Notification.objects.filter(
+            user=request.user
+        ).select_related('trip', 'student').order_by('-created_at')[:5]
+
+        alerts_data = [{
+            'id': n.id,
+            'title': n.title,
+            'desc': n.body,
+            'type': 'critical' if n.notification_type in [NotificationType.EMERGENCY, NotificationType.DELAY] else 
+                    'warning' if n.notification_type in [NotificationType.APPROACHING] else 'info',
+            'time': n.created_at
+        } for n in recent_notifications]
+
         stats = {
             'school_name': school.name,
-            'total_students': Student.objects.filter(school=school, is_active=True).count(),
-            'total_buses': Bus.objects.filter(school=school, is_active=True).count(),
-            'total_routes': Route.objects.filter(school=school, is_active=True).count(),
-            'total_conductors': SchoolMembership.objects.filter(
-                school=school, role=UserRole.CONDUCTOR, is_active=True
-            ).count(),
-            'total_drivers': SchoolMembership.objects.filter(
-                school=school, role=UserRole.DRIVER, is_active=True
-            ).count(),
-             # Add recent trips or alerts for local dash
-             'active_trips_count': 0, # Placeholder, fetch real count if needed
-             'pending_alerts': 0 
+            'school_logo': school_logo,
+            'active_features': list(active_features),
+            'overview': {
+                'total_students': total_students,
+                'total_staff': total_staff,
+                'total_buses': total_buses,
+                'present_today': present_count,
+                'attendance_percentage': round(attendance_percentage, 1),
+                'active_fleet_count': trip_stats['in_progress']
+            },
+            'trips': trip_stats,
+            'finance': {
+                'month_earnings': monthly_earnings,
+                'month_expenses': monthly_expenses,
+                'net_profit': monthly_earnings - monthly_expenses
+            },
+            'charts': {
+                'attendance_7_days': attendance_chart
+            },
+            'live_activity': recent_trips_data,
+            'alerts': alerts_data
         }
         
         return Response(stats)

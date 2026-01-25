@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsAPI, schoolsAPI, routesAPI } from '../lib/api'
@@ -169,10 +169,7 @@ export default function Students() {
                         <FiDownload className="mr-2" /> Export
                     </button>
                     <button
-                        onClick={() => {
-                            setEditingStudent(null)
-                            setShowModal(true)
-                        }}
+                        onClick={() => navigate('/students/new')}
                         className="btn-primary whitespace-nowrap text-sm"
                     >
                         <FiPlus className="mr-2" /> Add Student

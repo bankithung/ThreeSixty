@@ -3,6 +3,7 @@ Views for user accounts and authentication.
 """
 import logging
 from django.conf import settings
+from rest_framework.exceptions import ValidationError
 from rest_framework import status, generics, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -18,6 +19,8 @@ from .serializers import (
     AdminLoginSerializer,
     SchoolMembershipSerializer,
     CreateStaffSerializer,
+    UpdateStaffSerializer,
+    StaffDetailSerializer,
 )
 from core.permissions import IsRootAdmin, IsSchoolAdmin
 from core.utils import get_client_ip
@@ -164,17 +167,29 @@ class CreateStaffView(APIView):
     permission_classes = [IsSchoolAdmin]
     
     def post(self, request):
-        serializer = CreateStaffSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        
-        return Response({
-            'message': 'Staff member created successfully.',
-            'user': UserSerializer(user).data,
-        }, status=status.HTTP_201_CREATED)
+        try:
+            serializer = CreateStaffSerializer(
+                data=request.data,
+                context={'request': request}
+            )
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+            
+            return Response({
+                'message': 'Staff member created successfully.',
+                'user': UserSerializer(user).data,
+            }, status=status.HTTP_201_CREATED)
+        except ValidationError as e:
+            # Ensure frontend sees the real field errors (400) rather than a generic message
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception("Unexpected error while creating staff")
+            payload = {"message": "Internal server error while creating staff."}
+            if getattr(settings, "DEBUG", False):
+                # Include error details in development to speed up debugging
+                import traceback
+                payload["detail"] = traceback.format_exc()
+            return Response(payload, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class StaffListView(generics.ListAPIView):
@@ -186,7 +201,7 @@ class StaffListView(generics.ListAPIView):
         school_id = self.request.query_params.get('school_id')
         role = self.request.query_params.get('role')
         
-        queryset = SchoolMembership.objects.select_related('user', 'school')
+        queryset = SchoolMembership.objects.select_related('user', 'school').prefetch_related('user__staff_profile')
         
         # Exclude parents - staff is only for workers
         queryset = queryset.exclude(role='parent')
@@ -195,7 +210,9 @@ class StaffListView(generics.ListAPIView):
             queryset = queryset.filter(school_id=school_id)
         
         if role:
-            queryset = queryset.filter(role=role)
+            # Support multiple roles via comma-separated list
+            role_list = role.split(',')
+            queryset = queryset.filter(role__in=role_list)
         
         # Non-root admins can only see their school's staff
         if self.request.user.role != 'root_admin':
@@ -205,3 +222,64 @@ class StaffListView(generics.ListAPIView):
             queryset = queryset.filter(school_id__in=user_schools)
         
         return queryset
+
+
+class StaffDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve/Update/Delete a staff membership record.
+
+    The admin UI uses `member.id` from the staff list, which is the `SchoolMembership.id`,
+    so this endpoint is keyed by membership UUID.
+    """
+    serializer_class = SchoolMembershipSerializer
+    permission_classes = [IsSchoolAdmin]
+    queryset = SchoolMembership.objects.select_related('user', 'school')
+
+    def get_serializer_class(self):
+        """Use appropriate serializer based on request method."""
+        if self.request.method in ['PUT', 'PATCH']:
+            return UpdateStaffSerializer
+        # Use StaffDetailSerializer for GET to return full profile data
+        return StaffDetailSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset().exclude(role='parent')
+
+        # Non-root admins can only access their school's staff
+        if self.request.user.role != 'root_admin':
+            user_schools = SchoolMembership.objects.filter(
+                user=self.request.user
+            ).values_list('school_id', flat=True)
+            qs = qs.filter(school_id__in=user_schools)
+
+        return qs
+
+    def perform_update(self, serializer):
+        """
+        When updating is_active on membership, also sync it to the user model.
+        This ensures deactivating a staff member properly disables their login.
+        """
+        instance = serializer.save()
+        
+        # If is_active was explicitly set, sync it to the user
+        if 'is_active' in serializer.validated_data:
+            user = instance.user
+            user.is_active = instance.is_active
+            user.save(update_fields=['is_active'])
+        
+        return instance
+
+    def perform_destroy(self, instance: SchoolMembership):
+        """
+        Soft delete: Deactivate the membership and user instead of hard deleting.
+        This preserves all data while effectively disabling the account.
+        """
+        # Deactivate the membership
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])
+        
+        # Also deactivate the user account
+        user = instance.user
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+

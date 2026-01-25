@@ -24,6 +24,7 @@ from .serializers import (
     UpdateLocationSerializer,
     LocationUpdateSerializer,
 )
+from .models import Bus, BusStaff, Route, Stop, Trip, LocationUpdate, TripStatus, StudentTransportHistory
 from core.permissions import IsSchoolAdmin, IsStaff, IsConductorOrDriver, IsParent
 from apps.accounts.models import SchoolMembership, UserRole
 from apps.students.models import Student
@@ -938,5 +939,68 @@ class BusAnalyticsView(APIView):
             'expenses_by_category': list(expenses_by_category),
             'monthly_summary': monthly_summary[::-1],  # Reverse to show oldest first
             'trip_frequency': list(trip_counts),
+        })
+class StaffTransportAnalyticsView(APIView):
+    """
+    Get transport analytics for a staff member (driver/conductor).
+    Returns total driving time, distance, and student assignment history.
+    """
+    permission_classes = [IsStaff]
+
+    def get(self, request, staff_id):
+        # 1. Driving Stats (from Trips)
+        trips_as_driver = Trip.objects.filter(driver_id=staff_id, status=TripStatus.COMPLETED)
+        trips_as_conductor = Trip.objects.filter(conductor_id=staff_id, status=TripStatus.COMPLETED)
+        
+        # Aggregate stats
+        from django.db.models import Sum
+        driver_stats = trips_as_driver.aggregate(
+            total_time=Sum('duration_minutes'),
+            total_distance=Sum('distance_traveled')
+        )
+        conductor_stats = trips_as_conductor.aggregate(
+            total_time=Sum('duration_minutes'),
+            total_distance=Sum('distance_traveled')
+        )
+        
+        total_driving_minutes = (driver_stats['total_time'] or 0) + (conductor_stats['total_time'] or 0)
+        total_distance_km = (driver_stats['total_distance'] or 0) + (conductor_stats['total_distance'] or 0)
+        
+        # 2. Assignment History (from StudentTransportHistory)
+        # Find records where this staff was driver or conductor
+        history_qs = StudentTransportHistory.objects.filter(
+            Q(driver_id=staff_id) | Q(conductor_id=staff_id)
+        ).select_related('student', 'bus').order_by('-academic_year', '-start_date')
+        
+        # Group by Year -> Bus
+        history_data = {}
+        for record in history_qs:
+            year = record.academic_year
+            bus_num = record.bus.number if record.bus else 'Unknown Bus'
+            key = f"{year}|{bus_num}"
+            
+            if key not in history_data:
+                history_data[key] = {
+                    'academic_year': year,
+                    'bus_number': bus_num,
+                    'role': 'Driver' if record.driver_id == str(staff_id) else 'Conductor',
+                    'start_date': record.start_date,
+                    'end_date': record.end_date,
+                    'students': []
+                }
+            
+            history_data[key]['students'].append({
+                'name': record.student.full_name,
+                'admission_number': record.student.admission_number,
+                'photo': record.student.photo.url if record.student.photo else None
+            })
+            
+        return Response({
+            'analytics': {
+                'total_driving_minutes': total_driving_minutes,
+                'total_distance_km': total_distance_km,
+                'trip_count': trips_as_driver.count() + trips_as_conductor.count()
+            },
+            'history': list(history_data.values())
         })
 

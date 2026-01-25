@@ -14,6 +14,7 @@ from .views import (
     UserSchoolsView,
     CreateStaffView,
     StaffListView,
+    StaffDetailView,
 )
 
 app_name = 'accounts'
@@ -38,4 +39,5 @@ urlpatterns = [
     path('schools/', UserSchoolsView.as_view(), name='user-schools'),
     path('staff/', StaffListView.as_view(), name='staff-list'),
     path('staff/create/', CreateStaffView.as_view(), name='staff-create'),
+    path('staff/<uuid:pk>/', StaffDetailView.as_view(), name='staff-detail'),
 ]

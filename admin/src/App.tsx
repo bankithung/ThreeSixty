@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import Layout from './components/Layout'
@@ -9,8 +8,12 @@ import SchoolDetail from './pages/SchoolDetail'
 import AddSchool from './pages/AddSchool'
 import Students from './pages/Students'
 import StudentDetail from './pages/StudentDetail'
+import AddStudent from './pages/AddStudent'
 import Staff from './pages/Staff'
+import StaffDetail from './pages/StaffDetail'
 import Parents from './pages/Parents'
+import AddStaff from './pages/AddStaff'
+import Teachers from './pages/Teachers'
 import Buses from './pages/Buses'
 import AddBus from './pages/AddBus'
 import BusProfile from './pages/BusProfile'
@@ -62,8 +65,13 @@ function App() {
                 <Route path="schools/new" element={<AddSchool />} />
                 <Route path="schools/:id" element={<SchoolDetail />} />
                 <Route path="students" element={<Students />} />
+                <Route path="students/new" element={<AddStudent />} />
                 <Route path="students/:id" element={<StudentDetail />} />
                 <Route path="staff" element={<Staff />} />
+                <Route path="staff/new" element={<AddStaff />} />
+                <Route path="staff/:id" element={<StaffDetail />} />
+                <Route path="staff/edit/:id" element={<AddStaff />} />
+                <Route path="teachers" element={<Teachers />} />
                 <Route path="parents" element={<Parents />} />
                 <Route path="buses" element={<Buses />} />
                 <Route path="buses/new" element={<AddBus />} />

@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import { Provider } from 'react-redux'
 import { store } from './store'
 import { AuthProvider } from './hooks/useAuth'
+import { LayoutProvider } from './context/LayoutContext'
 import App from './App'
 import './index.css'
 
@@ -25,7 +26,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <QueryClientProvider client={queryClient}>
                 <Provider store={store}>
                     <AuthProvider>
-                        <App />
+                        <LayoutProvider>
+                            <App />
+                        </LayoutProvider>
                         <Toaster
                             position="top-right"
                             toastOptions={{

@@ -32,6 +32,7 @@ from .views import (
     BusUploadImageView,
     BusDeleteImageView,
     BusAnalyticsView,
+    StaffTransportAnalyticsView,
 )
 
 app_name = 'transport'
@@ -74,5 +75,8 @@ urlpatterns = [
     
     # Parent tracking
     path('track/child/<uuid:student_id>/', ChildTripView.as_view(), name='child-trip'),
+    
+    # Staff Analytics
+    path('staff-analytics/<uuid:staff_id>/', StaffTransportAnalyticsView.as_view(), name='staff-analytics'),
 ]
 

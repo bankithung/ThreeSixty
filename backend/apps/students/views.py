@@ -1,13 +1,14 @@
 """
-Views for students app.
+Views for students app - Comprehensive Admission System.
 """
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q
+from django.utils import timezone
 
-from .models import Student, Parent, FaceEncoding
+from .models import Student, Parent, FaceEncoding, StudentHealth, AuthorizedPickup, StudentDocument
 from .serializers import (
     StudentSerializer,
     StudentListSerializer,
@@ -17,6 +18,12 @@ from .serializers import (
     AddParentSerializer,
     FaceEncodingSerializer,
     ParentChildrenSerializer,
+    # New comprehensive serializers
+    StudentHealthSerializer,
+    AuthorizedPickupSerializer,
+    StudentDocumentSerializer,
+    ComprehensiveStudentSerializer,
+    ComprehensiveAdmissionSerializer,
 )
 from core.permissions import IsSchoolAdmin, IsStaff, IsParent, IsConductor
 from apps.accounts.models import SchoolMembership, UserRole
@@ -374,3 +381,200 @@ class StudentIdentifyView(APIView):
             {'identified': False, 'message': 'No match found'},
             status=status.HTTP_200_OK
         )
+
+
+# ========== COMPREHENSIVE ADMISSION VIEWS ==========
+
+class ComprehensiveAdmissionView(APIView):
+    """
+    Comprehensive student admission endpoint.
+    Creates parents, students, health records, and links them all.
+    """
+    permission_classes = [IsStaff]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
+    def post(self, request):
+        """Create students with full comprehensive data."""
+        serializer = ComprehensiveAdmissionSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            result = serializer.save()
+            
+            students = result['students']
+            parent_users = result['parent_users']
+            created_users = result['created_users']
+            
+            return Response({
+                'success': True,
+                'message': f'Successfully enrolled {len(students)} student(s) with {len(parent_users)} parent(s)',
+                'data': {
+                    'students': ComprehensiveStudentSerializer(students, many=True).data,
+                    'parent_count': len(parent_users),
+                    'created_parent_accounts': len(created_users),
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'Admission failed: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ComprehensiveStudentDetailView(generics.RetrieveUpdateAPIView):
+    """Get or update comprehensive student details."""
+    serializer_class = ComprehensiveStudentSerializer
+    permission_classes = [IsStaff]
+    
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Student.objects.select_related(
+            'school', 'route', 'stop', 'health'
+        ).prefetch_related(
+            'parents', 'parents__user', 'authorized_pickups', 'documents'
+        )
+        
+        if hasattr(user, 'role') and user.role != UserRole.ROOT_ADMIN:
+            school_ids = SchoolMembership.objects.filter(
+                user=user,
+                is_active=True
+            ).values_list('school_id', flat=True)
+            queryset = queryset.filter(school_id__in=school_ids)
+        
+        return queryset
+
+
+class StudentHealthView(generics.RetrieveUpdateAPIView, generics.CreateAPIView):
+    """Manage student health records."""
+    serializer_class = StudentHealthSerializer
+    permission_classes = [IsStaff]
+    
+    def get_object(self):
+        student_id = self.kwargs['pk']
+        try:
+            return StudentHealth.objects.get(student_id=student_id)
+        except StudentHealth.DoesNotExist:
+            return None
+    
+    def retrieve(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj is None:
+            return Response({'detail': 'No health record found'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = self.get_serializer(obj)
+        return Response(serializer.data)
+    
+    def create(self, request, *args, **kwargs):
+        student_id = self.kwargs['pk']
+        try:
+            student = Student.objects.get(pk=student_id)
+        except Student.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if health record already exists
+        if StudentHealth.objects.filter(student=student).exists():
+            return Response({'error': 'Health record already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = request.data.copy()
+        data['student'] = student_id
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def update(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj is None:
+            return self.create(request, *args, **kwargs)
+        return super().update(request, *args, **kwargs)
+
+
+class StudentDocumentListCreateView(generics.ListCreateAPIView):
+    """List or upload documents for a student."""
+    serializer_class = StudentDocumentSerializer
+    permission_classes = [IsStaff]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def get_queryset(self):
+        student_id = self.kwargs['pk']
+        return StudentDocument.objects.filter(student_id=student_id)
+    
+    def create(self, request, *args, **kwargs):
+        student_id = self.kwargs['pk']
+        try:
+            student = Student.objects.get(pk=student_id)
+        except Student.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'File is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        document_type = request.data.get('document_type')
+        if not document_type:
+            return Response({'error': 'Document type is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        document = StudentDocument.objects.create(
+            student=student,
+            document_type=document_type,
+            file=file,
+            original_filename=file.name,
+            file_size=file.size,
+            notes=request.data.get('notes', '')
+        )
+        
+        return Response(StudentDocumentSerializer(document).data, status=status.HTTP_201_CREATED)
+
+
+class StudentDocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Get, update, or delete a specific document."""
+    serializer_class = StudentDocumentSerializer
+    permission_classes = [IsStaff]
+    queryset = StudentDocument.objects.all()
+    
+    def perform_update(self, serializer):
+        # If verifying document
+        if self.request.data.get('is_verified'):
+            serializer.save(
+                is_verified=True,
+                verified_by=self.request.user,
+                verified_at=timezone.now()
+            )
+        else:
+            serializer.save()
+
+
+class AuthorizedPickupListCreateView(generics.ListCreateAPIView):
+    """List or add authorized pickup personnel."""
+    serializer_class = AuthorizedPickupSerializer
+    permission_classes = [IsStaff]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def get_queryset(self):
+        student_id = self.kwargs['pk']
+        return AuthorizedPickup.objects.filter(student_id=student_id)
+    
+    def create(self, request, *args, **kwargs):
+        student_id = self.kwargs['pk']
+        try:
+            student = Student.objects.get(pk=student_id)
+        except Student.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        data = request.data.copy()
+        data['student'] = student_id
+        
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AuthorizedPickupDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Get, update, or delete an authorized pickup person."""
+    serializer_class = AuthorizedPickupSerializer
+    permission_classes = [IsStaff]
+    queryset = AuthorizedPickup.objects.all()
+

@@ -445,3 +445,53 @@ class BusEarning(BaseModel):
     
     def __str__(self):
         return f"{self.bus.number} - {self.earning_type}: ₹{self.amount}"
+
+
+class StudentTransportHistory(BaseModel):
+    """
+    Historical record of student transport assignments.
+    Used to track which students were assigned to which bus/driver in the past.
+    """
+    student = models.ForeignKey(
+        'students.Student',
+        on_delete=models.CASCADE,
+        related_name='transport_history'
+    )
+    bus = models.ForeignKey(
+        Bus,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='student_history'
+    )
+    # capturing the driver/conductor at the time of assignment
+    driver = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='driver_student_history'
+    )
+    conductor = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='conductor_student_history'
+    )
+    academic_year = models.CharField(max_length=20)  # e.g., "2023-2024"
+    
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'student_transport_history'
+        verbose_name = 'Student Transport History'
+        verbose_name_plural = 'Student Transport History'
+        ordering = ['-start_date']
+        indexes = [
+            models.Index(fields=['student', '-start_date']),
+            models.Index(fields=['driver', 'academic_year']),
+        ]
+
+    def __str__(self):
+        return f"{self.student.full_name} - {self.bus.number if self.bus else 'No Bus'} ({self.academic_year})"
